@@ -56,7 +56,6 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 
 ## Getting Started
 - [Installation](docs/install.md) 
-- [Prepare Dataset](docs/prepare_dataset.md)
 - [Run and Eval](docs/eval.md)
 - [Troubleshooting Tips](docs/common-errors.md)
 
