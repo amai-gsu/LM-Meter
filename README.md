@@ -67,7 +67,7 @@ If this work is helpful for your research, please consider citing the following 
   author    = {Wang, Haoxin and Tu, Xiaolong and Ke, Hongyu and Chai, Huirong and Chen, Dawei and Han, Kyungtae},
   title     = {lm-Meter: Unveiling Runtime Inference Latency for On-Device Language Models},
   booktitle = {Proc. The Tenth ACM/IEEE Symposium on Edge Computing (SEC)},
-  pages     = {1--14},
+  pages     = {1--17},
   year      = {2025},
 }
 ```
