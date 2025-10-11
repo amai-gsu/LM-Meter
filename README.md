@@ -63,19 +63,19 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 
 ### 1. Phase-level profiling accuracy on Pixel 8 Pro:
 
-<div style="transform: scale(0.85); transform-origin: top left; font-size: 12px;">
-  <table>
-    | **Models** | **Phases** | **Profiled latency (ms)**<br>LM-METER | **Profiled latency (ms)**<br>AGI | **α (%)** | **ε★ (μs/ms)** |
+<p align="center" style="font-size: 11px; width: 80%;">
+<b>Table 4.</b> Phase-level profiling accuracy on Pixel 8 Pro
+</p>
+
+<div align="center" style="font-size: 11px; width: 80%;">
+
+| **Models** | **Phases** | **Profiled latency (ms)**<br>LM-METER | **Profiled latency (ms)**<br>AGI | **α (%)** | **ε★ (μs/ms)** |
 |-------------|------------|----------------------------------|----------------------------------|-------------|----------------|
 | **Llama-3.2–3B-Instruct** | Embedding | 0.8038 | 0.7763 | 96.46 | 35.412 |
-|  | Prefill | 3433.8628 | 3433.8142 | 99.99 | 0.014 |
-|  | Decode | 62.5669 | 62.5303 | 99.94 | 0.585 |
-|  | Softmax | 142.6166 | 142.6542 | 99.97 | 0.264 |
-|  | CopyProbsToCPU | 0.4929 | 0.4616 | 93.22 | 67.718 |
-|  | Sampling | 0.0675 | 0.0824 | 81.86 | 181.439 |
-|  | **End-to-end** | **3640.4104** | **3640.3191** | **99.99** | **0.025** |
-  </table>
+| ... | ... | ... | ... | ... | ... |
+
 </div>
+
 
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
