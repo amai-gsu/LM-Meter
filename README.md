@@ -75,7 +75,7 @@ If this work is helpful for your research, please consider citing the following 
 ## LM-Meter Performance & Overhead
 
 ### 1. Phase-level profiling accuracy on Pixel 8 Pro:
-<div style="font-size:6px; text-align:center; width:100%;">
+<div style="font-size:6px; text-align:center; width:80%;">
 <table style="border-collapse: collapse; border: 1px solid #000; width:100%;">
   <thead>
     <tr>
