@@ -63,29 +63,7 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 
 ### 1. Phase-level profiling accuracy on Pixel 8 Pro:
 
-| **Models** | **Phases** | **Profiled latency (ms)**<br>LM-METER | **Profiled latency (ms)**<br>AGI | **α (%)** | **ε★ (μs/ms)** |
-|-------------|------------|----------------------------------|----------------------------------|-------------|----------------|
-| **Llama-3.2–3B-Instruct** | Embedding | 0.8038 | 0.7763 | 96.46 | 35.412 |
-|  | Prefill | 3433.8628 | 3433.8142 | 99.99 | 0.014 |
-|  | Decode | 62.5669 | 62.5303 | 99.94 | 0.585 |
-|  | Softmax | 142.6166 | 142.6542 | 99.97 | 0.264 |
-|  | CopyProbsToCPU | 0.4929 | 0.4616 | 93.22 | 67.718 |
-|  | Sampling | 0.0675 | 0.0824 | 81.86 | 181.439 |
-|  | **End-to-end** | **3640.4104** | **3640.3191** | **99.99** | **0.025** |
-| **Gemma-2–2B-it** | Embedding | 0.7659 | 0.7398 | 96.48 | 35.226 |
-|  | Prefill | 9301.1318 | 9301.0589 | 99.99 | 0.008 |
-|  | Decode | 54.5909 | 54.5557 | 99.94 | 0.646 |
-|  | Softmax | 502.3319 | 502.3698 | 99.99 | 0.076 |
-|  | CopyProbsToCPU | 0.5570 | 0.5255 | 94.02 | 59.829 |
-|  | Sampling | 0.1698 | 0.1830 | 92.76 | 72.365 |
-|  | **End-to-end** | **9859.5473** | **9859.4329** | **99.99** | **0.012** |
-| **DeepSeek–R1-Distill-Qwen-1.5B** | Embedding | 0.6753 | 0.6531 | 96.60 | 33.975 |
-|  | Prefill | 7630.7553 | 7630.6979 | 99.99 | 0.008 |
-|  | Decode | 49.3840 | 49.3499 | 99.93 | 0.690 |
-|  | Softmax | 437.0047 | 437.0459 | 99.99 | 0.094 |
-|  | CopyProbsToCPU | 0.4206 | 0.3888 | 91.84 | 81.565 |
-|  | Sampling | 0.0671 | 0.0786 | 85.41 | 145.949 |
-|  | **End-to-end** | **8118.3069** | **8118.2143** | **99.99** | **0.011** |
+![Phase-level runtime latency profiling results on Google Pixel 8 Pro](docs/assets/phase.png)
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
 
