@@ -76,7 +76,7 @@ If this work is helpful for your research, please consider citing the following 
 
 ### 1. Phase-level profiling accuracy on Pixel 8 Pro:
 <small>
-<table style="border-collapse: collapse; font-size: 10px; text-align: center; width: 100%; border: 1px solid #000;">
+<table style="border-collapse: collapse; border: 1px solid #000; width:100%;">
   <thead>
     <tr>
       <th rowspan="2" style="border: 1px solid #000; padding: 4px;">Models</th>
