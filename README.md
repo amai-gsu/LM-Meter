@@ -61,7 +61,7 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 
 ## LM-Meter Performance
 
-### Table 4. Phase-level profiling accuracy on Pixel 8 Pro
+### Phase-level profiling accuracy on Pixel 8 Pro:
 
 | **Models** | **Phases** | **Profiled latency (ms)**<br>LM-METER | **Profiled latency (ms)**<br>AGI | **α (%)** | **ε★ (μs/ms)** |
 |-------------|------------|----------------------------------|----------------------------------|-------------|----------------|
@@ -79,13 +79,6 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 |  | CopyProbsToCPU | 0.5570 | 0.5255 | 94.02 | 59.829 |
 |  | Sampling | 0.1698 | 0.1830 | 92.76 | 72.365 |
 |  | **End-to-end** | **9859.5473** | **9859.4329** | **99.99** | **0.012** |
-| **TinyLlama–1.1B-Chat-v1.0** | Embedding | 0.6858 | 0.6636 | 96.66 | 33.428 |
-|  | Prefill | 5023.1182 | 5023.0765 | 99.99 | 0.008 |
-|  | Decode | 34.6845 | 34.6534 | 99.91 | 0.897 |
-|  | Softmax | 188.1463 | 188.1779 | 99.98 | 0.168 |
-|  | CopyProbsToCPU | 0.3887 | 0.3602 | 92.10 | 78.980 |
-|  | Sampling | 0.0504 | 0.0669 | 75.36 | 246.372 |
-|  | **End-to-end** | **5247.0738** | **5246.9985** | **99.99** | **0.014** |
 | **DeepSeek–R1-Distill-Qwen-1.5B** | Embedding | 0.6753 | 0.6531 | 96.60 | 33.975 |
 |  | Prefill | 7630.7553 | 7630.6979 | 99.99 | 0.008 |
 |  | Decode | 49.3840 | 49.3499 | 99.93 | 0.690 |
@@ -93,13 +86,6 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 |  | CopyProbsToCPU | 0.4206 | 0.3888 | 91.84 | 81.565 |
 |  | Sampling | 0.0671 | 0.0786 | 85.41 | 145.949 |
 |  | **End-to-end** | **8118.3069** | **8118.2143** | **99.99** | **0.011** |
-| **SmolLM2–360M-Instruct** | Embedding | 0.9844 | 0.9671 | 98.21 | 17.909 |
-|  | Prefill | 2399.3860 | 2399.3246 | 99.99 | 0.026 |
-|  | Decode | 44.7612 | 44.7377 | 99.95 | 0.527 |
-|  | Softmax | 221.8416 | 221.8672 | 99.99 | 0.116 |
-|  | CopyProbsToCPU | 0.3081 | 0.2854 | 92.05 | 79.532 |
-|  | Sampling | 0.0300 | 0.0394 | 76.06 | 239.395 |
-|  | **End-to-end** | **2667.3113** | **2667.2214** | **99.99** | **0.034** |
 
 
 ## Bibtex
