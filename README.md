@@ -80,6 +80,7 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
     </tr>
   </thead>
   <tbody>
+    <!-- Llama -->
     <tr>
       <td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">Llama-3.2-3B-Instruct</td>
       <td>Embedding</td><td>0.8038</td><td>0.7763</td><td>96.46</td><td>35.412</td>
@@ -90,6 +91,7 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
     <tr><td>CopyProbsToCPU</td><td>0.4929</td><td>0.4616</td><td>93.22</td><td>67.718</td></tr>
     <tr><td>Sampling</td><td>0.0675</td><td>0.0824</td><td>81.86</td><td>181.439</td></tr>
     <tr><td><b>End-to-end</b></td><td><b>3640.4104</b></td><td><b>3640.3191</b></td><td><b>99.99</b></td><td><b>0.025</b></td></tr>
+    <!-- Gemma -->
     <tr>
       <td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">Gemma-2-2B-it</td>
       <td>Embedding</td><td>0.7659</td><td>0.7398</td><td>96.48</td><td>35.226</td>
@@ -100,16 +102,7 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
     <tr><td>CopyProbsToCPU</td><td>0.5570</td><td>0.5255</td><td>94.02</td><td>59.829</td></tr>
     <tr><td>Sampling</td><td>0.1698</td><td>0.1830</td><td>92.76</td><td>72.365</td></tr>
     <tr><td><b>End-to-end</b></td><td><b>9859.5473</b></td><td><b>9859.4329</b></td><td><b>99.99</b></td><td><b>0.012</b></td></tr>
-    <tr>
-      <td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">TinyLlama-1.1B-Chat-v1.0</td>
-      <td>Embedding</td><td>0.6858</td><td>0.6636</td><td>96.66</td><td>33.428</td>
-    </tr>
-    <tr><td>Prefill</td><td>5023.1182</td><td>5023.0765</td><td>99.99</td><td>0.008</td></tr>
-    <tr><td>Decode</td><td>34.6845</td><td>34.6534</td><td>99.91</td><td>0.897</td></tr>
-    <tr><td>Softmax</td><td>188.1463</td><td>188.1779</td><td>99.98</td><td>0.168</td></tr>
-    <tr><td>CopyProbsToCPU</td><td>0.3887</td><td>0.3602</td><td>92.10</td><td>78.980</td></tr>
-    <tr><td>Sampling</td><td>0.0504</td><td>0.0669</td><td>75.36</td><td>246.372</td></tr>
-    <tr><td><b>End-to-end</b></td><td><b>5247.0738</b></td><td><b>5246.9985</b></td><td><b>99.99</b></td><td><b>0.014</b></td></tr>
+    <!-- DeepSeek -->
     <tr>
       <td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">DeepSeek-R1-Distill-Qwen-1.5B</td>
       <td>Embedding</td><td>0.6753</td><td>0.6531</td><td>96.60</td><td>33.975</td>
@@ -120,17 +113,6 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
     <tr><td>CopyProbsToCPU</td><td>0.4206</td><td>0.3888</td><td>91.84</td><td>81.565</td></tr>
     <tr><td>Sampling</td><td>0.0671</td><td>0.0786</td><td>85.41</td><td>145.949</td></tr>
     <tr><td><b>End-to-end</b></td><td><b>8118.3069</b></td><td><b>8118.2143</b></td><td><b>99.99</b></td><td><b>0.011</b></td></tr>
-    <!-- SmolLM -->
-    <tr>
-      <td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">SmolLM2-360M-Instruct</td>
-      <td>Embedding</td><td>0.9844</td><td>0.9671</td><td>98.21</td><td>17.909</td>
-    </tr>
-    <tr><td>Prefill</td><td>2399.3860</td><td>2399.3246</td><td>99.99</td><td>0.026</td></tr>
-    <tr><td>Decode</td><td>44.7612</td><td>44.7377</td><td>99.95</td><td>0.527</td></tr>
-    <tr><td>Softmax</td><td>221.8416</td><td>221.8672</td><td>99.99</td><td>0.116</td></tr>
-    <tr><td>CopyProbsToCPU</td><td>0.3081</td><td>0.2854</td><td>92.05</td><td>79.532</td></tr>
-    <tr><td>Sampling</td><td>0.0300</td><td>0.0394</td><td>76.06</td><td>239.395</td></tr>
-    <tr><td><b>End-to-end</b></td><td><b>2667.3113</b></td><td><b>2667.2214</b></td><td><b>99.99</b></td><td><b>0.034</b></td></tr>
   </tbody>
 </table>
 
