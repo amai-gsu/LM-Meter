@@ -62,47 +62,75 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 ## LM-Meter Performance & Overhead
 
 ### 1. Phase-level profiling accuracy on Pixel 8 Pro:
+<h3>Table 4. Phase-level profiling accuracy on Pixel 8 Pro</h3>
 
-| **Models** | **Phases** | **Profiled latency (ms)**<br>LM-METER | **Profiled latency (ms)**<br>AGI | **α (%)** | **ε★ (μs/ms)** |
-|-------------|------------|----------------------------------|----------------------------------|-------------|----------------|
-| **Llama-3.2–3B-Instruct** | Embedding | 0.8038 | 0.7763 | 96.46 | 35.412 |
-|  | Prefill | 3433.8628 | 3433.8142 | 99.99 | 0.014 |
-|  | Decode | 62.5669 | 62.5303 | 99.94 | 0.585 |
-|  | Softmax | 142.6166 | 142.6542 | 99.97 | 0.264 |
-|  | CopyProbsToCPU | 0.4929 | 0.4616 | 93.22 | 67.718 |
-|  | Sampling | 0.0675 | 0.0824 | 81.86 | 181.439 |
-|  | **End-to-end** | **3640.4104** | **3640.3191** | **99.99** | **0.025** |
-| **Gemma-2–2B-it** | Embedding | 0.7659 | 0.7398 | 96.48 | 35.226 |
-|  | Prefill | 9301.1318 | 9301.0589 | 99.99 | 0.008 |
-|  | Decode | 54.5909 | 54.5557 | 99.94 | 0.646 |
-|  | Softmax | 502.3319 | 502.3698 | 99.99 | 0.076 |
-|  | CopyProbsToCPU | 0.5570 | 0.5255 | 94.02 | 59.829 |
-|  | Sampling | 0.1698 | 0.1830 | 92.76 | 72.365 |
-|  | **End-to-end** | **9859.5473** | **9859.4329** | **99.99** | **0.012** |
-| **TinyLlama–1.1B-Chat-v1.0** | Embedding | 0.6858 | 0.6636 | 96.66 | 33.428 |
-|  | Prefill | 5023.1182 | 5023.0765 | 99.99 | 0.008 |
-|  | Decode | 34.6845 | 34.6534 | 99.91 | 0.897 |
-|  | Softmax | 188.1463 | 188.1779 | 99.98 | 0.168 |
-|  | CopyProbsToCPU | 0.3887 | 0.3602 | 92.10 | 78.980 |
-|  | Sampling | 0.0504 | 0.0669 | 75.36 | 246.372 |
-|  | **End-to-end** | **5247.0738** | **5246.9985** | **99.99** | **0.014** |
-| **DeepSeek–R1-Distill-Qwen-1.5B** | Embedding | 0.6753 | 0.6531 | 96.60 | 33.975 |
-|  | Prefill | 7630.7553 | 7630.6979 | 99.99 | 0.008 |
-|  | Decode | 49.3840 | 49.3499 | 99.93 | 0.690 |
-|  | Softmax | 437.0047 | 437.0459 | 99.99 | 0.094 |
-|  | CopyProbsToCPU | 0.4206 | 0.3888 | 91.84 | 81.565 |
-|  | Sampling | 0.0671 | 0.0786 | 85.41 | 145.949 |
-|  | **End-to-end** | **8118.3069** | **8118.2143** | **99.99** | **0.011** |
-| **SmolLM2–360M-Instruct** | Embedding | 0.9844 | 0.9671 | 98.21 | 17.909 |
-|  | Prefill | 2399.3860 | 2399.3246 | 99.99 | 0.026 |
-|  | Decode | 44.7612 | 44.7377 | 99.95 | 0.527 |
-|  | Softmax | 221.8416 | 221.8672 | 99.99 | 0.116 |
-|  | CopyProbsToCPU | 0.3081 | 0.2854 | 92.05 | 79.532 |
-|  | Sampling | 0.0300 | 0.0394 | 76.06 | 239.395 |
-|  | **End-to-end** | **2667.3113** | **2667.2214** | **99.99** | **0.034** |
+<table style="border-collapse: collapse; font-size: 12px; text-align: center; width: 100%;">
+  <thead>
+    <tr>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;">Models</th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;">Phases</th>
+      <th colspan="2" style="border: 1px solid #000; padding: 4px;">Profiled latency (ms)</th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;">α (%)</th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;">ε★ (μs/ms)</th>
+    </tr>
+    <tr>
+      <th style="border: 1px solid #000; padding: 4px;">LM-METER</th>
+      <th style="border: 1px solid #000; padding: 4px;">AGI</th>
+    </tr>
+  </thead>
 
+  <tbody>
+    <!-- Llama -->
+    <tr><td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">Llama-3.2-3B-Instruct</td>
+        <td style="border: 1px solid #000;">Embedding</td><td>0.8038</td><td>0.7763</td><td>96.46</td><td>35.412</td></tr>
+    <tr><td>Prefill</td><td>3433.8628</td><td>3433.8142</td><td>99.99</td><td>0.014</td></tr>
+    <tr><td>Decode</td><td>62.5669</td><td>62.5303</td><td>99.94</td><td>0.585</td></tr>
+    <tr><td>Softmax</td><td>142.6166</td><td>142.6542</td><td>99.97</td><td>0.264</td></tr>
+    <tr><td>CopyProbsToCPU</td><td>0.4929</td><td>0.4616</td><td>93.22</td><td>67.718</td></tr>
+    <tr><td>Sampling</td><td>0.0675</td><td>0.0824</td><td>81.86</td><td>181.439</td></tr>
+    <tr><td><b>End-to-end</b></td><td><b>3640.4104</b></td><td><b>3640.3191</b></td><td><b>99.99</b></td><td><b>0.025</b></td></tr>
 
+    <!-- Gemma -->
+    <tr><td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">Gemma-2-2B-it</td>
+        <td>Embedding</td><td>0.7659</td><td>0.7398</td><td>96.48</td><td>35.226</td></tr>
+    <tr><td>Prefill</td><td>9301.1318</td><td>9301.0589</td><td>99.99</td><td>0.008</td></tr>
+    <tr><td>Decode</td><td>54.5909</td><td>54.5557</td><td>99.94</td><td>0.646</td></tr>
+    <tr><td>Softmax</td><td>502.3319</td><td>502.3698</td><td>99.99</td><td>0.076</td></tr>
+    <tr><td>CopyProbsToCPU</td><td>0.5570</td><td>0.5255</td><td>94.02</td><td>59.829</td></tr>
+    <tr><td>Sampling</td><td>0.1698</td><td>0.1830</td><td>92.76</td><td>72.365</td></tr>
+    <tr><td><b>End-to-end</b></td><td><b>9859.5473</b></td><td><b>9859.4329</b></td><td><b>99.99</b></td><td><b>0.012</b></td></tr>
 
+    <!-- TinyLlama -->
+    <tr><td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">TinyLlama-1.1B-Chat-v1.0</td>
+        <td>Embedding</td><td>0.6858</td><td>0.6636</td><td>96.66</td><td>33.428</td></tr>
+    <tr><td>Prefill</td><td>5023.1182</td><td>5023.0765</td><td>99.99</td><td>0.008</td></tr>
+    <tr><td>Decode</td><td>34.6845</td><td>34.6534</td><td>99.91</td><td>0.897</td></tr>
+    <tr><td>Softmax</td><td>188.1463</td><td>188.1779</td><td>99.98</td><td>0.168</td></tr>
+    <tr><td>CopyProbsToCPU</td><td>0.3887</td><td>0.3602</td><td>92.10</td><td>78.980</td></tr>
+    <tr><td>Sampling</td><td>0.0504</td><td>0.0669</td><td>75.36</td><td>246.372</td></tr>
+    <tr><td><b>End-to-end</b></td><td><b>5247.0738</b></td><td><b>5246.9985</b></td><td><b>99.99</b></td><td><b>0.014</b></td></tr>
+
+    <!-- DeepSeek -->
+    <tr><td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">DeepSeek-R1-Distill-Qwen-1.5B</td>
+        <td>Embedding</td><td>0.6753</td><td>0.6531</td><td>96.60</td><td>33.975</td></tr>
+    <tr><td>Prefill</td><td>7630.7553</td><td>7630.6979</td><td>99.99</td><td>0.008</td></tr>
+    <tr><td>Decode</td><td>49.3840</td><td>49.3499</td><td>99.93</td><td>0.690</td></tr>
+    <tr><td>Softmax</td><td>437.0047</td><td>437.0459</td><td>99.99</td><td>0.094</td></tr>
+    <tr><td>CopyProbsToCPU</td><td>0.4206</td><td>0.3888</td><td>91.84</td><td>81.565</td></tr>
+    <tr><td>Sampling</td><td>0.0671</td><td>0.0786</td><td>85.41</td><td>145.949</td></tr>
+    <tr><td><b>End-to-end</b></td><td><b>8118.3069</b></td><td><b>8118.2143</b></td><td><b>99.99</b></td><td><b>0.011</b></td></tr>
+
+    <!-- SmolLM -->
+    <tr><td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">SmolLM2-360M-Instruct</td>
+        <td>Embedding</td><td>0.9844</td><td>0.9671</td><td>98.21</td><td>17.909</td></tr>
+    <tr><td>Prefill</td><td>2399.3860</td><td>2399.3246</td><td>99.99</td><td>0.026</td></tr>
+    <tr><td>Decode</td><td>44.7612</td><td>44.7377</td><td>99.95</td><td>0.527</td></tr>
+    <tr><td>Softmax</td><td>221.8416</td><td>221.8672</td><td>99.99</td><td>0.116</td></tr>
+    <tr><td>CopyProbsToCPU</td><td>0.3081</td><td>0.2854</td><td>92.05</td><td>79.532</td></tr>
+    <tr><td>Sampling</td><td>0.0300</td><td>0.0394</td><td>76.06</td><td>239.395</td></tr>
+    <tr><td><b>End-to-end</b></td><td><b>2667.3113</b></td><td><b>2667.2214</b></td><td><b>99.99</b></td><td><b>0.034</b></td></tr>
+  </tbody>
+</table>
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
 
