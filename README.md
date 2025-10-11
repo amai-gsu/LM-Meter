@@ -116,8 +116,52 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
+<!-- 
+![Kernel-level runtime latency profiling results on Google Pixel 8 Pro and Pixel 7](docs/assets/kernel.png) -->
+<h3>Table 5. Kernel-level runtime latency profiling results on Google Pixel 8 Pro and Pixel 7</h3>
 
-![Kernel-level runtime latency profiling results on Google Pixel 8 Pro and Pixel 7](docs/assets/kernel.png)
+<table style="border-collapse: collapse; width: 100%; font-size: 12px; text-align: center; border: 1px solid #000;">
+  <thead>
+    <tr>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;">Kernels</th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;">Phases</th>
+      <th colspan="4" style="border: 1px solid #000; padding: 4px;">Google Pixel 8 Pro</th>
+      <th colspan="2" style="border: 1px solid #000; padding: 4px;">Google Pixel 7</th>
+    </tr>
+    <tr>
+      <th style="border: 1px solid #000; padding: 4px;">Profiled latency (ms)<br><span style="font-variant: small-caps;">LM-Meter</span></th>
+      <th style="border: 1px solid #000; padding: 4px;">Profiled latency (ms)<br>GT</th>
+      <th style="border: 1px solid #000; padding: 4px;">α (%)</th>
+      <th style="border: 1px solid #000; padding: 4px;">ε★ (μs/ms)</th>
+      <th style="border: 1px solid #000; padding: 4px;">α (%)</th>
+      <th style="border: 1px solid #000; padding: 4px;">ε★ (μs/ms)</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <!-- Prefill -->
+    <tr><td>dequantize1_NT_matmul5</td><td rowspan="4" style="border: 1px solid #000; padding: 4px;">Prefill</td><td>81.1899</td><td>82.1329</td><td>98.85</td><td>11.481</td><td>98.88</td><td>11.212</td></tr>
+    <tr><td>dequantize2_NT_matmul6</td><td>31.3407</td><td>31.7568</td><td>98.69</td><td>13.103</td><td>95.18</td><td>48.209</td></tr>
+    <tr><td>dequantize3_NT_matmul7</td><td>330.3757</td><td>332.7218</td><td>99.29</td><td>7.051</td><td>98.87</td><td>11.328</td></tr>
+    <tr><td>dequantize4_NT_matmul8</td><td>367.5603</td><td>367.0284</td><td><b>99.86 (highest)</b></td><td>1.449</td><td>99.11</td><td>8.896</td></tr>
+    <!-- Decode -->
+    <tr><td>dequantize1_NT_matmul10</td><td rowspan="9" style="border: 1px solid #000; padding: 4px;">Decode</td><td>0.3643</td><td>0.3737</td><td>97.46</td><td>25.391</td><td>97.19</td><td>28.145</td></tr>
+    <tr><td>dequantize2_NT_matmul11</td><td>0.2062</td><td>0.2006</td><td>97.23</td><td>27.706</td><td>98.14</td><td>18.587</td></tr>
+    <tr><td>dequantize3_NT_matmul12</td><td>1.3813</td><td>1.3601</td><td>98.44</td><td>15.587</td><td>98.17</td><td>18.267</td></tr>
+    <tr><td>dequantize4_NT_matmul13</td><td>0.6862</td><td>0.6586</td><td>95.81</td><td>41.921</td><td>97.50</td><td>25.044</td></tr>
+    <tr><td>dequantize_NT_matmul14_divide2_tir_tanh2_multiply8</td><td>18.4379</td><td>18.3619</td><td>99.59</td><td>4.147</td><td>98.13</td><td>18.705</td></tr>
+    <tr><td>add_norm_prefill</td><td>0.1149</td><td>0.1059</td><td><b>91.51 (lowest)</b></td><td>84.891</td><td>93.29</td><td>67.080</td></tr>
+    <tr><td>rms_norm2</td><td>0.1037</td><td>0.1092</td><td>94.93</td><td>50.641</td><td>92.65</td><td>73.531</td></tr>
+    <tr><td>split2_gelu_tanh2_multiply7</td><td>0.0952</td><td>0.0939</td><td>98.62</td><td>13.727</td><td>93.75</td><td>62.517</td></tr>
+    <tr><td>multiply6</td><td>0.1061</td><td>0.1005</td><td>94.35</td><td>56.546</td><td><b>90.31</b></td><td>96.934</td></tr>
+    <!-- Softmax -->
+    <tr><td>chunk_lse</td><td rowspan="2" style="border: 1px solid #000; padding: 4px;">Softmax</td><td>0.2718</td><td>0.2839</td><td>95.53</td><td>44.735</td><td>99.39</td><td>6.026</td></tr>
+    <tr><td>softmax_with_chunked_sum</td><td>0.2376</td><td>0.2392</td><td>99.33</td><td>6.689</td><td><b>99.40</b></td><td>5.992</td></tr>
+    <!-- Embedding -->
+    <tr><td>dequantize_take1</td><td style="border: 1px solid #000; padding: 4px;">Embedding</td><td>0.1034</td><td>0.1097</td><td>94.26</td><td>57.429</td><td>95.73</td><td>42.676</td></tr>
+  </tbody>
+</table>
+
 
 
 ### 3. Kernel-level profiling accuracy on Pixel 8 Pro:
