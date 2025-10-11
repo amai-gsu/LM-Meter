@@ -59,9 +59,9 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 - [Run and Eval](docs/eval.md)
 - [Troubleshooting Tips](docs/common-errors.md)
 
-## LM-Meter Performance
+## LM-Meter Performance & Overhead
 
-### Phase-level profiling accuracy on Pixel 8 Pro:
+### 1. Phase-level profiling accuracy on Pixel 8 Pro:
 
 | **Models** | **Phases** | **Profiled latency (ms)**<br>LM-METER | **Profiled latency (ms)**<br>AGI | **α (%)** | **ε★ (μs/ms)** |
 |-------------|------------|----------------------------------|----------------------------------|-------------|----------------|
@@ -87,6 +87,32 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 |  | Sampling | 0.0671 | 0.0786 | 85.41 | 145.949 |
 |  | **End-to-end** | **8118.3069** | **8118.2143** | **99.99** | **0.011** |
 
+### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
+
+| **Kernels** | **Phases** | **Profiled latency (ms)**<br>LM-METER | **Profiled latency (ms)**<br>GT | **α (%)** | **ε★ (μs/ms)** | **α (%) (Pixel 7)** | **ε★ (μs/ms) (Pixel 7)** |
+|--------------|-------------|--------------------------------------|---------------------------------|-------------|----------------|-------------------------|------------------------------|
+| **Prefill** |  |  |  |  |  |  |  |
+| dequantize1_NT_matmul5 |  | 81.1899 | 82.1329 | 98.85 | 11.481 | 98.88 | 11.212 |
+| dequantize2_NT_matmul6 |  | 31.3407 | 31.7568 | 98.69 | 13.103 | 95.18 | 48.209 |
+| dequantize3_NT_matmul7 |  | 330.3757 | 332.7218 | 99.29 | 7.051 | 98.87 | 11.328 |
+| dequantize4_NT_matmul8 |  | 367.5603 | 367.0284 | **99.86 (highest)** | 1.449 | 99.11 | 8.896 |
+| **Decode** |  |  |  |  |  |  |  |
+| dequantize1_NT_matmul10 |  | 0.3643 | 0.3737 | 97.46 | 25.391 | 97.19 | 28.145 |
+| dequantize2_NT_matmul11 |  | 0.2062 | 0.2006 | 97.23 | 27.706 | 98.14 | 18.587 |
+| dequantize3_NT_matmul12 |  | 1.3813 | 1.3601 | 98.44 | 15.587 | 98.17 | 18.267 |
+| dequantize4_NT_matmul13 |  | 0.6862 | 0.6586 | 95.81 | 41.921 | 97.50 | 25.044 |
+| dequantize_NT_matmul14_divide2_tir_tanh2_multiply8 |  | 18.4379 | 18.3619 | 99.59 | 4.147 | 98.13 | 18.705 |
+| add_norm_prefill |  | 0.1149 | 0.1059 | **91.51 (lowest)** | 84.891 | 93.29 | 67.080 |
+| rms_norm2 |  | 0.1037 | 0.1092 | 94.93 | 50.641 | 92.65 | 73.531 |
+| split2_gelu_tanh2_multiply7 |  | 0.0952 | 0.0939 | 98.62 | 13.727 | 93.75 | 62.517 |
+| multiply6 |  | 0.1061 | 0.1005 | 94.35 | 56.546 | **90.31** | 96.934 |
+| **Softmax** |  |  |  |  |  |  |  |
+| chunk_lse |  | 0.2718 | 0.2839 | 95.53 | 44.735 | 99.39 | 6.026 |
+| softmax_with_chunked_sum |  | 0.2376 | 0.2392 | 99.33 | 6.689 | **99.40** | 5.992 |
+| **Embedding** |  |  |  |  |  |  |  |
+| dequantize_take1 |  | 0.1034 | 0.1097 | 94.26 | 57.429 | 95.73 | 42.676 |
+
+### 3. Kernel-level profiling accuracy on Pixel 8 Pro:
 
 ## Bibtex
 If this work is helpful for your research, please consider citing the following BibTeX entry.
