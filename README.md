@@ -119,7 +119,7 @@ If this work is helpful for your research, please consider citing the following 
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
 
-<table border="1" cellspacing="0" cellpadding="2" style="border-collapse: collapse; width: 80%; text-align: center;">
+<table border="1" cellspacing="0" cellpadding="2" style="border-collapse: collapse; width: 90%; text-align: center;">
   <thead>
     <tr>
       <th rowspan="2" style="border: 1px solid #000;"><sub>Kernels</sub></th>
@@ -128,12 +128,17 @@ If this work is helpful for your research, please consider citing the following 
       <th colspan="2" style="border: 1px solid #000;"><sub>Google Pixel 7</sub></th>
     </tr>
     <tr>
-      <th style="border: 1px solid #000;"><sub>Profiled latency (ms)<br>LM-Meter</sub></th>
-      <th style="border: 1px solid #000;"><sub>Profiled latency (ms)<br>GT</sub></th>
-      <th style="border: 1px solid #000;"><sub>α (%)</sub></th>
-      <th style="border: 1px solid #000;"><sub>ε★ (μs/ms)</sub></th>
-      <th style="border: 1px solid #000;"><sub>α (%)</sub></th>
-      <th style="border: 1px solid #000;"><sub>ε★ (μs/ms)</sub></th>
+      <th colspan="2" style="border: 1px solid #000;"><sub>Profiled latency (ms)</sub></th>
+      <th rowspan="1" style="border: 1px solid #000;"><sub>α (%)</sub></th>
+      <th rowspan="1" style="border: 1px solid #000;"><sub>ε★ (μs/ms)</sub></th>
+      <th rowspan="1" style="border: 1px solid #000;"><sub>α (%)</sub></th>
+      <th rowspan="1" style="border: 1px solid #000;"><sub>ε★ (μs/ms)</sub></th>
+    </tr>
+    <tr>
+      <th colspan="2" style="border: none;"></th>
+      <th style="border: 1px solid #000;"><sub>LM-METER</sub></th>
+      <th style="border: 1px solid #000;"><sub>GT</sub></th>
+      <th colspan="3" style="border: none;"></th>
     </tr>
   </thead>
 
