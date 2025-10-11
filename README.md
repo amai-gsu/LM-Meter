@@ -115,6 +115,48 @@ If this work is helpful for your research, please consider citing the following 
   </tbody>
 </table>
 
+<table border="1" style="border-collapse: collapse; width:100%; text-align:center;">
+  <thead>
+    <tr>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;"><sub><sub>Models</sub></sub></th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;"><sub><sub>Phases</sub></sub></th>
+      <th colspan="2" style="border: 1px solid #000; padding: 4px;"><sub><sub>Profiled latency (ms)</sub></sub></th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;"><sub><sub>α (%)</sub></sub></th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 4px;"><sub><sub>ε★ (μs/ms)</sub></sub></th>
+    </tr>
+    <tr>
+      <th style="border: 1px solid #000; padding: 4px;"><sub><sub>LM-METER</sub></sub></th>
+      <th style="border: 1px solid #000; padding: 4px;"><sub><sub>AGI</sub></sub></th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <!-- Llama -->
+    <tr>
+      <td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);"><sub><sub>Llama-3.2-3B-Instruct</sub></sub></td>
+      <td><sub><sub>Embedding</sub></sub></td><td><sub><sub>0.8038</sub></sub></td><td><sub><sub>0.7763</sub></sub></td><td><sub><sub>96.46</sub></sub></td><td><sub><sub>35.412</sub></sub></td>
+    </tr>
+    <tr><td><sub><sub>Prefill</sub></sub></td><td><sub><sub>3433.8628</sub></sub></td><td><sub><sub>3433.8142</sub></sub></td><td><sub><sub>99.99</sub></sub></td><td><sub><sub>0.014</sub></sub></td></tr>
+    <tr><td><sub><sub>Decode</sub></sub></td><td><sub><sub>62.5669</sub></sub></td><td><sub><sub>62.5303</sub></sub></td><td><sub><sub>99.94</sub></sub></td><td><sub><sub>0.585</sub></sub></td></tr>
+    <tr><td><sub><sub>Softmax</sub></sub></td><td><sub><sub>142.6166</sub></sub></td><td><sub><sub>142.6542</sub></sub></td><td><sub><sub>99.97</sub></sub></td><td><sub><sub>0.264</sub></sub></td></tr>
+    <tr><td><sub><sub>CopyProbsToCPU</sub></sub></td><td><sub><sub>0.4929</sub></sub></td><td><sub><sub>0.4616</sub></sub></td><td><sub><sub>93.22</sub></sub></td><td><sub><sub>67.718</sub></sub></td></tr>
+    <tr><td><sub><sub>Sampling</sub></sub></td><td><sub><sub>0.0675</sub></sub></td><td><sub><sub>0.0824</sub></sub></td><td><sub><sub>81.86</sub></sub></td><td><sub><sub>181.439</sub></sub></td></tr>
+    <tr><td><b><sub><sub>End-to-end</sub></sub></b></td><td><b><sub><sub>3640.4104</sub></sub></b></td><td><b><sub><sub>3640.3191</sub></sub></b></td><td><b><sub><sub>99.99</sub></sub></b></td><td><b><sub><sub>0.025</sub></sub></b></td></tr>
+    <!-- Gemma -->
+    <tr>
+      <td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);"><sub><sub>Gemma-2-2B-it</sub></sub></td>
+      <td><sub><sub>Embedding</sub></sub></td><td><sub><sub>0.7659</sub></sub></td><td><sub><sub>0.7398</sub></sub></td><td><sub><sub>96.48</sub></sub></td><td><sub><sub>35.226</sub></sub></td>
+    </tr>
+    <tr><td><sub><sub>Prefill</sub></sub></td><td><sub><sub>9301.1318</sub></sub></td><td><sub><sub>9301.0589</sub></sub></td><td><sub><sub>99.99</sub></sub></td><td><sub><sub>0.008</sub></sub></td></tr>
+    <tr><td><sub><sub>Decode</sub></sub></td><td><sub><sub>54.5909</sub></sub></td><td><sub><sub>54.5557</sub></sub></td><td><sub><sub>99.94</sub></sub></td><td><sub><sub>0.646</sub></sub></td></tr>
+    <tr><td><sub><sub>Softmax</sub></sub></td><td><sub><sub>502.3319</sub></sub></td><td><sub><sub>502.3698</sub></sub></td><td><sub><sub>99.99</sub></sub></td><td><sub><sub>0.076</sub></sub></td></tr>
+    <tr><td><sub><sub>CopyProbsToCPU</sub></sub></td><td><sub><sub>0.5570</sub></sub></td><td><sub><sub>0.5255</sub></sub></td><td><sub><sub>94.02</sub></sub></td><td><sub><sub>59.829</sub></sub></td></tr>
+    <tr><td><sub><sub>Sampling</sub></sub></td><td><sub><sub>0.1698</sub></sub></td><td><sub><sub>0.1830</sub></sub></td><td><sub><sub>92.76</sub></sub></td><td><sub><sub>72.365</sub></sub></td></tr>
+    <tr><td><b><sub><sub>End-to-end</sub></sub></b></td><td><b><sub><sub>9859.5473</sub></sub></b></td><td><b><sub><sub>9859.4329</sub></sub></b></td><td><b><sub><sub>99.99</sub></sub></b></td><td><b><sub><sub>0.012</sub></sub></b></td></tr>
+  </tbody>
+</table>
+
+
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
 
 <table style="border-collapse: collapse; width: 80%; font-size: 9px; text-align: center; border: 1px solid #000;">
