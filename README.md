@@ -113,17 +113,6 @@ If this work is helpful for your research, please consider citing the following 
     <tr><td>CopyProbsToCPU</td><td>0.5570</td><td>0.5255</td><td>94.02</td><td>59.829</td></tr>
     <tr><td>Sampling</td><td>0.1698</td><td>0.1830</td><td>92.76</td><td>72.365</td></tr>
     <tr><td><b>End-to-end</b></td><td><b>9859.5473</b></td><td><b>9859.4329</b></td><td><b>99.99</b></td><td><b>0.012</b></td></tr>
-    <!-- DeepSeek -->
-    <tr>
-      <td rowspan="7" style="border: 1px solid #000; padding: 4px; writing-mode: vertical-rl; transform: rotate(180deg);">DeepSeek-R1-Distill-Qwen-1.5B</td>
-      <td>Embedding</td><td>0.6753</td><td>0.6531</td><td>96.60</td><td>33.975</td>
-    </tr>
-    <tr><td>Prefill</td><td>7630.7553</td><td>7630.6979</td><td>99.99</td><td>0.008</td></tr>
-    <tr><td>Decode</td><td>49.3840</td><td>49.3499</td><td>99.93</td><td>0.690</td></tr>
-    <tr><td>Softmax</td><td>437.0047</td><td>437.0459</td><td>99.99</td><td>0.094</td></tr>
-    <tr><td>CopyProbsToCPU</td><td>0.4206</td><td>0.3888</td><td>91.84</td><td>81.565</td></tr>
-    <tr><td>Sampling</td><td>0.0671</td><td>0.0786</td><td>85.41</td><td>145.949</td></tr>
-    <tr><td><b>End-to-end</b></td><td><b>8118.3069</b></td><td><b>8118.2143</b></td><td><b>99.99</b></td><td><b>0.011</b></td></tr>
   </tbody>
 </table>
 <small><small><small>
