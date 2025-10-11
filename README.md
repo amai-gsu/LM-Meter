@@ -63,8 +63,6 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 
 ### 1. Phase-level profiling accuracy on Pixel 8 Pro:
 
-<h3>Table 4. Phase-level profiling accuracy on Pixel 8 Pro</h3>
-
 <table style="border-collapse: collapse; font-size: 12px; text-align: center; width: 100%; border: 1px solid #000;">
   <thead>
     <tr>
