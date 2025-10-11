@@ -115,7 +115,7 @@ If this work is helpful for your research, please consider citing the following 
   </tbody>
 </table>
 
-<table border="1" cellspacing="0" cellpadding="1" style="border-collapse: collapse; width:100%; text-align:center;">
+<table border="1" cellspacing="0" cellpadding="0" style="border-collapse: collapse; width:100%; text-align:center;">
   <thead>
     <tr>
       <th rowspan="2" style="border: 1px solid #000; padding: 4px;"><sub><sub>Models</sub></sub></th>
