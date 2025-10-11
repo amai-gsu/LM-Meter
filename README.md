@@ -72,7 +72,7 @@ If this work is helpful for your research, please consider citing the following 
 - [Run and Eval](docs/eval.md)
 - [Troubleshooting Tips](docs/common-errors.md)
 
-## LM-Meter Performance & Overhead
+<!-- ## LM-Meter Performance & Overhead
 
 ### 1. Phase-level profiling accuracy on Pixel 8 Pro:
 
@@ -158,7 +158,7 @@ If this work is helpful for your research, please consider citing the following 
     <!-- Embedding -->
     <tr><td><sub>dequantize_take1</sub></td><td style="border: 1px solid #000;"><sub>Embedding</sub></td><td><sub>0.1034</sub></td><td><sub>0.1097</sub></td><td><sub>94.26</sub></td><td><sub>57.429</sub></td><td><sub>95.73</sub></td><td><sub>42.676</sub></td></tr>
   </tbody>
-</table>
+</table> -->
 
 
 
