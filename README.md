@@ -143,7 +143,6 @@ If this work is helpful for your research, please consider citing the following 
     <tr><td><sub>dequantize2_NT_matmul6</sub></td><td><sub>31.3407</sub></td><td><sub>31.7568</sub></td><td><sub>98.69</sub></td><td><sub>13.103</sub></td><td><sub>95.18</sub></td><td><sub>48.209</sub></td></tr>
     <tr><td><sub>dequantize3_NT_matmul7</sub></td><td><sub>330.3757</sub></td><td><sub>332.7218</sub></td><td><sub>99.29</sub></td><td><sub>7.051</sub></td><td><sub>98.87</sub></td><td><sub>11.328</sub></td></tr>
     <tr><td><sub>dequantize4_NT_matmul8</sub></td><td><sub>367.5603</sub></td><td><sub>367.0284</sub></td><td><b><sub>99.86 (highest)</sub></b></td><td><sub>1.449</sub></td><td><sub>99.11</sub></td><td><sub>8.896</sub></td></tr>
-
     <!-- Decode -->
     <tr><td><sub>dequantize1_NT_matmul10</sub></td><td rowspan="9" style="border: 1px solid #000;"><sub>Decode</sub></td><td><sub>0.3643</sub></td><td><sub>0.3737</sub></td><td><sub>97.46</sub></td><td><sub>25.391</sub></td><td><sub>97.19</sub></td><td><sub>28.145</sub></td></tr>
     <tr><td><sub>dequantize2_NT_matmul11</sub></td><td><sub>0.2062</sub></td><td><sub>0.2006</sub></td><td><sub>97.23</sub></td><td><sub>27.706</sub></td><td><sub>98.14</sub></td><td><sub>18.587</sub></td></tr>
@@ -154,11 +153,9 @@ If this work is helpful for your research, please consider citing the following 
     <tr><td><sub>rms_norm2</sub></td><td><sub>0.1037</sub></td><td><sub>0.1092</sub></td><td><sub>94.93</sub></td><td><sub>50.641</sub></td><td><sub>92.65</sub></td><td><sub>73.531</sub></td></tr>
     <tr><td><sub>split2_gelu_tanh2_multiply7</sub></td><td><sub>0.0952</sub></td><td><sub>0.0939</sub></td><td><sub>98.62</sub></td><td><sub>13.727</sub></td><td><sub>93.75</sub></td><td><sub>62.517</sub></td></tr>
     <tr><td><sub>multiply6</sub></td><td><sub>0.1061</sub></td><td><sub>0.1005</sub></td><td><sub>94.35</sub></td><td><sub>56.546</sub></td><td><b><sub>90.31</sub></b></td><td><sub>96.934</sub></td></tr>
-
     <!-- Softmax -->
     <tr><td><sub>chunk_lse</sub></td><td rowspan="2" style="border: 1px solid #000;"><sub>Softmax</sub></td><td><sub>0.2718</sub></td><td><sub>0.2839</sub></td><td><sub>95.53</sub></td><td><sub>44.735</sub></td><td><sub>99.39</sub></td><td><sub>6.026</sub></td></tr>
     <tr><td><sub>softmax_with_chunked_sum</sub></td><td><sub>0.2376</sub></td><td><sub>0.2392</sub></td><td><sub>99.33</sub></td><td><sub>6.689</sub></td><td><b><sub>99.40</sub></b></td><td><sub>5.992</sub></td></tr>
-
     <!-- Embedding -->
     <tr><td><sub>dequantize_take1</sub></td><td style="border: 1px solid #000;"><sub>Embedding</sub></td><td><sub>0.1034</sub></td><td><sub>0.1097</sub></td><td><sub>94.26</sub></td><td><sub>57.429</sub></td><td><sub>95.73</sub></td><td><sub>42.676</sub></td></tr>
   </tbody>
