@@ -54,6 +54,19 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 </table>
 </div>
 
+## Bibtex
+If this work is helpful for your research, please consider citing the following BibTeX entry.
+
+```
+@inproceedings{wang2025sec,
+  author    = {Wang, Haoxin and Tu, Xiaolong and Ke, Hongyu and Chai, Huirong and Chen, Dawei and Han, Kyungtae},
+  title     = {lm-Meter: Unveiling Runtime Inference Latency for On-Device Language Models},
+  booktitle = {Proc. The Tenth ACM/IEEE Symposium on Edge Computing (SEC)},
+  pages     = {1--17},
+  year      = {2025},
+}
+```
+
 ## Getting Started
 - [Installation](docs/install.md) 
 - [Run and Eval](docs/eval.md)
@@ -116,11 +129,8 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
-<!-- 
-![Kernel-level runtime latency profiling results on Google Pixel 8 Pro and Pixel 7](docs/assets/kernel.png) -->
-<h3>Table 5. Kernel-level runtime latency profiling results on Google Pixel 8 Pro and Pixel 7</h3>
 
-<table style="border-collapse: collapse; width: 100%; font-size: 12px; text-align: center; border: 1px solid #000;">
+<table style="border-collapse: collapse; width: 80%; font-size: 9px; text-align: center; border: 1px solid #000;">
   <thead>
     <tr>
       <th rowspan="2" style="border: 1px solid #000; padding: 4px;">Kernels</th>
@@ -162,22 +172,9 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
   </tbody>
 </table>
 
-
-
 ### 3. Kernel-level profiling accuracy on Pixel 8 Pro:
 
-## Bibtex
-If this work is helpful for your research, please consider citing the following BibTeX entry.
 
-```
-@inproceedings{wang2025sec,
-  author    = {Wang, Haoxin and Tu, Xiaolong and Ke, Hongyu and Chai, Huirong and Chen, Dawei and Han, Kyungtae},
-  title     = {lm-Meter: Unveiling Runtime Inference Latency for On-Device Language Models},
-  booktitle = {Proc. The Tenth ACM/IEEE Symposium on Edge Computing (SEC)},
-  pages     = {1--17},
-  year      = {2025},
-}
-```
 
 ## Acknowledgement
 
