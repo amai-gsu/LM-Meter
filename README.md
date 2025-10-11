@@ -89,6 +89,7 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
 
+![Kernel-level runtime latency profiling results on Google Pixel 8 Pro and Pixel 7](docs/assets/kernel.png)
 
 
 ### 3. Kernel-level profiling accuracy on Pixel 8 Pro:
