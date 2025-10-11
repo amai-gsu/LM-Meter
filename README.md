@@ -75,7 +75,7 @@ If this work is helpful for your research, please consider citing the following 
 ## LM-Meter Performance & Overhead
 
 ### 1. Phase-level profiling accuracy on Pixel 8 Pro:
-
+<small>
 <table style="border-collapse: collapse; font-size: 10px; text-align: center; width: 100%; border: 1px solid #000;">
   <thead>
     <tr>
@@ -126,7 +126,7 @@ If this work is helpful for your research, please consider citing the following 
     <tr><td><b>End-to-end</b></td><td><b>8118.3069</b></td><td><b>8118.2143</b></td><td><b>99.99</b></td><td><b>0.011</b></td></tr>
   </tbody>
 </table>
-
+<small>
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
 
