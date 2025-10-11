@@ -118,7 +118,7 @@ If this work is helpful for your research, please consider citing the following 
 </table>
 
 ### 2. Kernel-level profiling accuracy on Pixel 8 Pro and Pixel 7:
-<table border="1" cellspacing="0" cellpadding="2" style="border-collapse: collapse; width: 80%; text-align: center;">
+<table border="1" cellspacing="0" cellpadding="2" style="border-collapse: collapse; width: 100%; text-align: center;">
   <thead>
     <tr>
       <th rowspan="2" style="border: 1px solid #000;"><sub>Kernels</sub></th>
