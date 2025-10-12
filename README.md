@@ -11,7 +11,7 @@
 
 </div>
 
-## About
+## 📌 About
 This is the official code repository for the paper ["lm-Meter: Unveiling Runtime Inference Latency for On-Device Language Models"](https://www.amai-gsu.us/wp-content/uploads/2025/lm-meter.pdf).
 LM-Meter is a lightweight, online profiler for large language models (LLMs) running on mobile and edge devices. The mission of this project is to provide fine-grained, real-time visibility into on-device LLM inference at both **phase** and **kernel** levels, enabling researchers and developers to understand performance-efficiency trade-offs, identify bottlenecks, and systematically optimize models for resource-constrained platforms.
 
@@ -55,7 +55,7 @@ LM-Meter is a lightweight, online profiler for large language models (LLMs) runn
 </table>
 </div>
 
-## Bibtex
+## 🔖 Bibtex
 If this work is helpful for your research, please consider citing the following BibTeX entry.
 
 ```
@@ -157,7 +157,7 @@ Below are phase-level profiling results of different LLMs obtained using LM-Mete
   </tbody>
 </table>
 
-## Profiling Overhead
+## 🧩 Profiling Overhead
 
 To quantify **LM-Meter**’s profiling overhead, we evaluate its impact on throughput (in tokens per second) across the two primary inference phases—**prefill** and **decode**—under three CPU governor configurations that represent different levels of on-device resource availability:  
 1. **Performance:** All CPU cores are prioritized to operate at peak frequencies.  
@@ -219,7 +219,7 @@ To quantify **LM-Meter**’s profiling overhead, we evaluate its impact on throu
 
 Even under the **Powersave** configuration, where system resources are most constrained, **LM-Meter** exhibits only a modest throughput reduction of **2.58 %** during prefill and **0.99 %** during decode. 
 
-## Getting Started
+## 🚀 Getting Started
 - [Installation](docs/install.md) 
 - [Run and Eval](docs/eval.md)
 - [Troubleshooting Tips](docs/common-errors.md)
