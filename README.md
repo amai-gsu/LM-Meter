@@ -68,7 +68,7 @@ If this work is helpful for your research, please consider citing the following 
 }
 ```
 ## ✨ Profiling Examples
-Here are kernel-level profiling results of [Gemma-2-2B-it](https://huggingface.co/google/gemma-2-2b-it) on a Google Pixel 8 Pro and Pixel 7 using LM-Meter.
+Below are the kernel-level profiling results of [Gemma-2-2B-it](https://huggingface.co/google/gemma-2-2b-it) on Google Pixel 8 Pro and Pixel 7 devices, obtained using LM-Meter. Please refer to our paper (Section 4.3) for detailed description of the experimental setup and ground-truth measurements.
 <table border="1" cellspacing="0" cellpadding="2" style="border-collapse: collapse; width: 80%; text-align: center;">
   <thead>
     <tr>
@@ -113,6 +113,8 @@ Here are kernel-level profiling results of [Gemma-2-2B-it](https://huggingface.c
 
 The figure below illustrate the architecture of [Gemma-2-2B-it](https://huggingface.co/google/gemma-2-2b-it).
 <img src="docs/assets/Gemma2.png" alt="Gemma2 model architecture"/>
+
+Here are phase-level profiling 
 
 ## Getting Started
 - [Installation](docs/install.md) 
