@@ -68,7 +68,7 @@ If this work is helpful for your research, please consider citing the following 
 }
 ```
 ## ✨ Profiling Examples
-Here are kernel-level profiling results of Gemma-2-2B-it on a Google Pixel 8 Pro using LM-Meter.
+Here are kernel-level profiling results of [Gemma-2-2B-it](https://huggingface.co/google/gemma-2-2b-it) on a Google Pixel 8 Pro and Pixel 7 using LM-Meter.
 <table border="1" cellspacing="0" cellpadding="2" style="border-collapse: collapse; width: 80%; text-align: center;">
   <thead>
     <tr>
@@ -111,8 +111,8 @@ Here are kernel-level profiling results of Gemma-2-2B-it on a Google Pixel 8 Pro
   </tbody>
 </table>
 
-The figure below illustrate the architecture of Gemma2-2B-it.
-<img src="docs/assets/Gemma2.png" alt="examples" style="zoom:50%;" />
+The figure below illustrate the architecture of [Gemma-2-2B-it](https://huggingface.co/google/gemma-2-2b-it).
+<img src="docs/assets/Gemma2.png" alt="Gemma2 model architecture"/>
 
 ## Getting Started
 - [Installation](docs/install.md) 
