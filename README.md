@@ -112,7 +112,7 @@ Here are kernel-level profiling results of Gemma-2-2B-it on a Google Pixel 8 Pro
 </table>
 
 The figure below illustrate the architecture of Gemma2-2B-it.
-<img src="docs/assets/Gemma2.pdf" alt="examples" style="zoom:50%;" />
+<img src="docs/assets/Gemma2.png" alt="examples" style="zoom:50%;" />
 
 ## Getting Started
 - [Installation](docs/install.md) 
