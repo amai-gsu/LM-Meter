@@ -224,6 +224,10 @@ Even under the **Powersave** configuration, where system resources are most cons
 - [Run and Eval](docs/eval.md)
 - [Troubleshooting Tips](docs/common-errors.md)
 
+## 📬 Contact
+
+If you have any questions, please contact **Haoxin Wang** at [haoxinwang@gsu.edu](mailto:haoxinwang@gsu.edu).
+
 ## Acknowledgement
 
 Many thanks to these excellent open source projects:
