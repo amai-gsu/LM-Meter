@@ -159,7 +159,7 @@ Below are phase-level profiling results of different LLMs obtained using LM-Mete
 
 ## 🧩 Profiling Overhead
 
-To quantify **LM-Meter**’s profiling overhead, we evaluate its impact on throughput (in tokens per second) across the two primary inference phases—**prefill** and **decode**—under three CPU governor configurations that represent different levels of on-device resource availability:  
+To quantify **LM-Meter**’s profiling overhead, we evaluate its impact on throughput (in tokens per second) across the two primary inference phases, **prefill** and **decode**, under three CPU governor configurations that represent different levels of on-device resource availability:  
 1. **Performance:** All CPU cores are prioritized to operate at peak frequencies.  
 2. **Conservative:** Dynamic DVFS with a bias toward lower frequencies.  
 3. **Powersave:** All CPU cores are restricted to their minimum frequencies.  
