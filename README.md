@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 
-**Online Kernel-Level Profiler for On-Device LLMs**
+**Online Kernel-Level Profiler for On-Device Large Language Models (LLMs)**
 
 [🚀 Quick Start](docs/install.md) | [📘 Documentation](docs/) | [📑 Paper](https://www.amai-gsu.us/wp-content/uploads/2025/lm-meter.pdf) | [🎥 Demo Video](#) (coming soon) | [🖥️ Slides](#) (coming soon)
 
