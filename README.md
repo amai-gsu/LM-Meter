@@ -68,7 +68,7 @@ If this work is helpful for your research, please consider citing the following 
 }
 ```
 ## ✨ Profiling Examples
-
+Here are kernel-level profiling results of Gemma-2-2B-it on a Google Pixel 8 Pro using LM-Meter.
 <table border="1" cellspacing="0" cellpadding="2" style="border-collapse: collapse; width: 80%; text-align: center;">
   <thead>
     <tr>
@@ -111,6 +111,8 @@ If this work is helpful for your research, please consider citing the following 
   </tbody>
 </table>
 
+The figure below illustrate the architecture of Gemma2-2B-it.
+<img src="docs/assets/Gemma2.pdf" alt="examples" style="zoom:50%;" />
 
 ## Getting Started
 - [Installation](docs/install.md) 
