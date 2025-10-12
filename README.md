@@ -12,6 +12,7 @@
 </div>
 
 ## About
+This is the official code repository for the paper ["lm-Meter: Unveiling Runtime Inference Latency for On-Device Language Models"](https://www.amai-gsu.us/wp-content/uploads/2025/lm-meter.pdf).
 LM-Meter is a lightweight, online profiler for large language models (LLMs) running on mobile and edge devices. The mission of this project is to provide fine-grained, real-time visibility into on-device LLM inference at both phase and kernel levels, enabling researchers and developers to understand performance-efficiency trade-offs, identify bottlenecks, and systematically optimize models for resource-constrained platforms.
 
 <div align="center">
