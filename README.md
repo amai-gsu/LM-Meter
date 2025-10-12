@@ -164,14 +164,58 @@ To quantify **LM-Meter**’s profiling overhead, we evaluate its impact on throu
 2. **Conservative:** Dynamic DVFS with a bias toward lower frequencies.  
 3. **Powersave:** All CPU cores are restricted to their minimum frequencies.  
 
-| **CPU Governor** | **Phase** | **No Profiling (tokens/s)** | **LM-Meter (tokens/s)** | **Slowdown (%)** |
-|------------------|------------|-----------------------------|--------------------------|------------------|
-| **Performance**  | Prefill    | 0.680 | 0.680 | 0.00 % |
-|                  | Decode     | 8.327 | 8.319 | 0.10 % |
-| **Conservative** | Prefill    | 0.679 | 0.679 | 0.00 % |
-|                  | Decode     | 7.954 | 7.885 | 0.87 % |
-| **Powersave**    | Prefill    | 0.658 | 0.641 | 2.58 % |
-|                  | Decode     | 2.703 | 2.676 | 0.99 % |
+<table>
+  <thead>
+    <tr>
+      <th>CPU Governor</th>
+      <th>Phase</th>
+      <th>No Profiling (tokens/s)</th>
+      <th>LM-Meter (tokens/s)</th>
+      <th>Slowdown (%)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="2"><b>Performance</b></td>
+      <td>Prefill</td>
+      <td>0.680</td>
+      <td>0.680</td>
+      <td>0.00%</td>
+    </tr>
+    <tr>
+      <td>Decode</td>
+      <td>8.327</td>
+      <td>8.319</td>
+      <td>0.10%</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><b>Conservative</b></td>
+      <td>Prefill</td>
+      <td>0.679</td>
+      <td>0.679</td>
+      <td>0.00%</td>
+    </tr>
+    <tr>
+      <td>Decode</td>
+      <td>7.954</td>
+      <td>7.885</td>
+      <td>0.87%</td>
+    </tr>
+    <tr>
+      <td rowspan="2"><b>Powersave</b></td>
+      <td>Prefill</td>
+      <td>0.658</td>
+      <td>0.641</td>
+      <td>2.58%</td>
+    </tr>
+    <tr>
+      <td>Decode</td>
+      <td>2.703</td>
+      <td>2.676</td>
+      <td>0.99%</td>
+    </tr>
+  </tbody>
+</table>
 
 Even under the **Powersave** configuration, where system resources are most constrained, **LM-Meter** exhibits only a modest throughput reduction of **2.58 %** during prefill and **0.99 %** during decode. 
 
