@@ -157,6 +157,21 @@ Below are phase-level profiling results of different LLMs obtained using LM-Mete
   </tbody>
 </table>
 
+## Profiling Overhead
+
+To quantify LM-Meter's profiling overhead, we measure the throughput (in tokens per second) of the two primary inference phases, prefill and decode, under three CPUgovernor configurations that emulate varying levels of on-device resource availability: (1) Performance: All CPU cores are prioritized to operate at their peak frequencies; (2) Conservative: Dynamic DVFS with a bias toward lower frequencies; (3) Powersave: All CPU cores are prioritized to run at their minimum frequencies.
+
+| **CPU Governor** | **Phase** | **No Profiling (tokens/s)** | **LM-Meter (tokens/s)** | **Slowdown (%)** |
+|------------------|------------|-----------------------------|--------------------------|------------------|
+| **Performance**  | Prefill    | 0.680 | 0.680 | 0.00 % |
+|                  | Decode     | 8.327 | 8.319 | 0.10 % |
+| **Conservative** | Prefill    | 0.679 | 0.679 | 0.00 % |
+|                  | Decode     | 7.954 | 7.885 | 0.87 % |
+| **Powersave**    | Prefill    | 0.658 | 0.641 | 2.58 % |
+|                  | Decode     | 2.703 | 2.676 | 0.99 % |
+
+
+Even under the Powersave setting, where system resources are most constrained, lm-Meter exhibits only a modest throughput reduction of 2.58% for prefill and 0.99% throughput for decode.
 
 ## Getting Started
 - [Installation](docs/install.md) 
