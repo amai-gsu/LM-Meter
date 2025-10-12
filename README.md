@@ -114,14 +114,54 @@ Below are the kernel-level profiling results of [Gemma-2-2B-it](https://huggingf
 The figure below illustrate the architecture of [Gemma-2-2B-it](https://huggingface.co/google/gemma-2-2b-it).
 <img src="docs/assets/Gemma2.png" alt="Gemma2 model architecture"/>
 
-Here are phase-level profiling 
+Below are phase-level profiling results of different LLMs obtained using LM-Meter. Please refer to our paper (Section 4.2) for full results, detailed description of the experimental setup and ground-truth measurements.
+
+<table border="1" cellspacing="0" cellpadding="2" style="border-collapse: collapse; width:100%; text-align:center;">
+  <thead>
+    <tr>
+      <th rowspan="2" style="border: 1px solid #000; padding: 2px;"><sub>Models</sub></th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 2px;"><sub>Phases</sub></th>
+      <th colspan="2" style="border: 1px solid #000; padding: 2px;"><sub>Profiled latency (ms)</sub></th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 2px;"><sub>α (%)</sub></th>
+      <th rowspan="2" style="border: 1px solid #000; padding: 2px;"><sub>ε★ (μs/ms)</sub></th>
+    </tr>
+    <tr>
+      <th style="border: 1px solid #000; padding: 2px;"><sub>LM-METER</sub></th>
+      <th style="border: 1px solid #000; padding: 2px;"><sub>AGI</sub></th>
+    </tr>
+  </thead>
+
+  <tbody>
+    <!-- Llama -->
+    <tr>
+      <td rowspan="7" style="border: 1px solid #000; padding: 2px; writing-mode: vertical-rl; transform: rotate(180deg);"><sub>Llama-3.2-3B-Instruct</sub></td>
+      <td><sub>Embedding</sub></td><td><sub>0.8038</sub></td><td><sub>0.7763</sub></td><td><sub>96.46</sub></td><td><sub>35.412</sub></td>
+    </tr>
+    <tr><td><sub>Prefill</sub></td><td><sub>3433.8628</sub></td><td><sub>3433.8142</sub></td><td><sub>99.99</sub></td><td><sub>0.014</sub></td></tr>
+    <tr><td><sub>Decode</sub></td><td><sub>62.5669</sub></td><td><sub>62.5303</sub></td><td><sub>99.94</sub></td><td><sub>0.585</sub></td></tr>
+    <tr><td><sub>Softmax</sub></td><td><sub>142.6166</sub></td><td><sub>142.6542</sub></td><td><sub>99.97</sub></td><td><sub>0.264</sub></td></tr>
+    <tr><td><sub>CopyProbsToCPU</sub></td><td><sub>0.4929</sub></td><td><sub>0.4616</sub></td><td><sub>93.22</sub></td><td><sub>67.718</sub></td></tr>
+    <tr><td><sub>Sampling</sub></td><td><sub>0.0675</sub></td><td><sub>0.0824</sub></td><td><sub>81.86</sub></td><td><sub>181.439</sub></td></tr>
+    <tr><td><b><sub>End-to-end</sub></b></td><td><b><sub>3640.4104</sub></b></td><td><b><sub>3640.3191</sub></b></td><td><b><sub>99.99</sub></b></td><td><b><sub>0.025</sub></b></td></tr>
+    <!-- Gemma -->
+    <tr>
+      <td rowspan="7" style="border: 1px solid #000; padding: 2px; writing-mode: vertical-rl; transform: rotate(180deg);"><sub>Gemma-2-2B-it</sub></td>
+      <td><sub>Embedding</sub></td><td><sub>0.7659</sub></td><td><sub>0.7398</sub></td><td><sub>96.48</sub></td><td><sub>35.226</sub></td>
+    </tr>
+    <tr><td><sub>Prefill</sub></td><td><sub>9301.1318</sub></td><td><sub>9301.0589</sub></td><td><sub>99.99</sub></td><td><sub>0.008</sub></td></tr>
+    <tr><td><sub>Decode</sub></td><td><sub>54.5909</sub></td><td><sub>54.5557</sub></td><td><sub>99.94</sub></td><td><sub>0.646</sub></td></tr>
+    <tr><td><sub>Softmax</sub></td><td><sub>502.3319</sub></td><td><sub>502.3698</sub></td><td><sub>99.99</sub></td><td><sub>0.076</sub></td></tr>
+    <tr><td><sub>CopyProbsToCPU</sub></td><td><sub>0.5570</sub></td><td><sub>0.5255</sub></td><td><sub>94.02</sub></td><td><sub>59.829</sub></td></tr>
+    <tr><td><sub>Sampling</sub></td><td><sub>0.1698</sub></td><td><sub>0.1830</sub></td><td><sub>92.76</sub></td><td><sub>72.365</sub></td></tr>
+    <tr><td><b><sub>End-to-end</sub></b></td><td><b><sub>9859.5473</sub></b></td><td><b><sub>9859.4329</sub></b></td><td><b><sub>99.99</sub></b></td><td><b><sub>0.012</sub></b></td></tr>
+  </tbody>
+</table>
+
 
 ## Getting Started
 - [Installation](docs/install.md) 
 - [Run and Eval](docs/eval.md)
 - [Troubleshooting Tips](docs/common-errors.md)
-
-
 
 ## Acknowledgement
 
