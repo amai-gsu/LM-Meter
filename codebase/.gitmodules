@@ -1,0 +1,4 @@
+[submodule "mlc-llm-inf/3rdparty/perfetto"]
+	path = mlc-llm-inf/3rdparty/perfetto
+	url = https://github.com/google/perfetto.git
+	branch = v50.1
