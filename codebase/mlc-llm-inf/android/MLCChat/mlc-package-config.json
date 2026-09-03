@@ -1,0 +1,72 @@
+{
+    "device": "android",
+    "model_list": [
+        {
+            "model": "HF://mlc-ai/SmolLM2-135M-Instruct-q4f16_1-MLC",
+            "model_id": "SmolLM2-135M-Instruct-q4f16_1-MLC",
+            "estimated_vram_bytes": 1000000000,
+            "overrides": {
+                "context_window_size": 2048,
+                "prefill_chunk_size": 2048
+            }
+        },
+        {
+            "model": "HF://mlc-ai/SmolLM2-360M-Instruct-q4f16_1-MLC",
+            "model_id": "SmolLM2-360M-Instruct-q4f16_1-MLC",
+            "estimated_vram_bytes": 3000000000,
+            "overrides": {
+                "context_window_size": 2048,
+                "prefill_chunk_size": 2048
+            }
+        },
+        {
+            "model": "HF://mlc-ai/SmolLM2-1.7B-Instruct-q4f16_1-MLC",
+            "model_id": "SmolLM2-1.7B-Instruct-q4f16_1-MLC",
+            "estimated_vram_bytes": 4000000000,
+            "overrides": {
+                "context_window_size": 2048,
+                "prefill_chunk_size": 2048
+            }
+        },
+        {
+            "model": "HF://AMAI-Lab/pythia-70m-q4f16-1",
+            "estimated_vram_bytes": 1000000000,
+            "model_id": "pythia-70m-q4f16-1"
+        },
+        {
+            "model": "HF://AMAI-Lab/pythia-160m-q4f16-1",
+            "estimated_vram_bytes": 1000000000,
+            "model_id": "pythia-160m-q4f16-1"
+        },
+        {
+            "model": "HF://AMAI-Lab/pythia-410m-q4f16-1",
+            "estimated_vram_bytes": 2000000000,
+            "model_id": "pythia-410m-q4f16-1"
+        },
+        {
+            "model": "HF://AMAI-Lab/pythia-1b-q4f16-1",
+            "estimated_vram_bytes": 3000000000,
+            "model_id": "pythia-1b-q4f16-1"
+        },
+        {
+            "model": "HF://AMAI-Lab/pythia-1.4b-q4f16-1",
+            "estimated_vram_bytes": 4000000000,
+            "model_id": "pythia-1.4b-q4f16-1"
+        },
+        {
+            "model": "HF://mlc-ai/Qwen2.5-0.5B-Instruct-q0f16-MLC",
+            "model_id": "Qwen2.5-0.5B-Instruct-q0f16-MLC",
+            "estimated_vram_bytes": 3000000000
+        },
+        {
+            "model": "HF://mlc-ai/Qwen2-0.5B-Instruct-q0f16-MLC",
+            "model_id": "Qwen2-0.5B-Instruct-q0f16-MLC",
+            "estimated_vram_bytes": 3000000000
+        },
+        {
+            "model": "HF://mlc-ai/Qwen1.5-0.5B-Chat-q0f16-MLC",
+            "model_id": "Qwen1.5-0.5B-Chat-q0f16-MLC",
+            "estimated_vram_bytes": 3000000000
+        }
+    ]
+}

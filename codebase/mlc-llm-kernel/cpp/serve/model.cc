@@ -1,0 +1,1393 @@
+/*!
+ *  Copyright (c) 2023-2025 by Contributors
+ * \file serve/model.cc
+ * \brief The implementation of runtime module of LLM functions (prefill/decode/etc.)
+ */
+#include "model.h"
+
+#include <tvm/runtime/memory/memory_manager.h>
+#include <tvm/runtime/nvtx.h>
+#include <tvm/runtime/packed_func.h>
+#include <tvm/runtime/registry.h>
+
+#include <fstream>
+
+#include "../support/json_parser.h"
+#include "../support/vlm_utils.h"
+#include "config.h"
+#include "logit_processor.h"
+
+namespace mlc {
+namespace llm {
+namespace serve {
+
+/*********************** Model Implementation ***********************/
+
+class ModelImpl;
+
+TVM_REGISTER_OBJECT_TYPE(ModelObj);
+
+Model Model::Create(String reload_lib_path, String model_path, const picojson::object& model_config,
+                    DLDevice device, const Optional<Session>& session, int num_shards,
+                    int num_stages, bool trace_enabled) {
+  return Model(make_object<ModelImpl>(reload_lib_path, model_path, model_config, device, session,
+                                      num_shards, num_stages, trace_enabled));
+}
+
+Result<picojson::object> Model::LoadModelConfig(const String& model_path) {
+  using TResult = Result<picojson::object>;
+  picojson::object model_config;
+  std::ifstream config_istream((model_path + "/mlc-chat-config.json").c_str());
+  std::ostringstream config_ostream;
+  ICHECK(config_istream);
+  config_ostream << config_istream.rdbuf();
+  std::string config_str = config_ostream.str();
+  picojson::value config_json;
+  std::string err = picojson::parse(config_json, config_str);
+  if (!err.empty()) {
+    return TResult::Error(err);
+  }
+  picojson::object config = config_json.get<picojson::object>();
+  return TResult::Ok(config);
+}
+
+class ModelImpl : public ModelObj {
+ public:
+  /*!
+   * \brief Constructor of ModelImpl.
+   * \sa Model::Create
+   */
+  explicit ModelImpl(String reload_lib_path, String model_path, picojson::object model_config,
+                     DLDevice device, const Optional<Session>& session, int num_shards,
+                     int num_stages, bool trace_enabled)
+      : model_(model_path), device_(device) {
+    // Step 1. Process model config json string.
+    LoadModelConfigJSON(model_config);
+    // Step 2. Initialize vm, we use the packed function mechanism
+    // so there is no explicit abi dependency on these extra
+    // classes other than basic tvm runtime.
+    this->ft_.Init(reload_lib_path, device_, model_config, session, num_shards, num_stages);
+
+    //=============== Kernel-level profile =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      LOG(WARNING) << "ft_.Init. ------ KERNEL_LEVEL_PROFILE is ON";
+    #else
+      LOG(WARNING) << "ft_.Init. ------ KERNEL_LEVEL_PROFILE is OFF";
+    #endif
+    //==========
+
+    this->num_shards_ = ft_.model_metadata_.tensor_parallel_shards;
+    this->num_stages_ = ft_.model_metadata_.pipeline_parallel_stages;
+    // Step 3. Reset
+    this->Reset();
+    // Step 4. Set model type
+    this->kind = GetMetadata().kv_state_kind;
+  }
+
+  /*********************** Model Computation  ***********************/
+
+  ObjectRef TokenEmbed(IntTuple token_ids, ObjectRef* dst, int offset) final {
+    NVTXScopedRange nvtx_scope("TokenEmbed");
+    int num_tokens = token_ids.size();
+    // Copy input token ids to device.
+    DLDataType dtype(DataType::Int(32));
+    NDArray token_ids_nd;
+    {
+      NVTXScopedRange nvtx_scope("Allocate token_ids at offset");
+      token_ids_nd = token_ids_storage_->AllocNDArray(offset * 4, {num_tokens}, dtype);
+      int* p_token_ids = static_cast<int*>(token_ids_nd->data) + (token_ids_nd->byte_offset) / 4;
+      for (int i = 0; i < num_tokens; ++i) {
+        p_token_ids[i] = token_ids[i];
+      }
+    }
+    ICHECK_EQ(token_ids_nd->ndim, 1);
+    ICHECK_EQ(token_ids_nd->shape[0], num_tokens);
+    ICHECK_NE(prefill_chunk_size_, -1);
+    ObjectRef token_ids_dref_or_nd;
+    {
+      NVTXScopedRange nvtx_scope("Copy to worker 0");
+      token_ids_dref_or_nd = ft_.CopyToWorker0(token_ids_nd, "token_ids", {prefill_chunk_size_});
+    }
+    //=============== Kernel-level profile =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      if (params_.defined()) {
+        LOG(WARNING) << "params_ type: " << params_->GetTypeKey();
+      } else {
+        LOG(WARNING) << "params_ is undefined.";
+      }
+      ObjectRef embeddings = ft_.profile_func_("embed", token_ids_dref_or_nd, params_);
+      LOG(WARNING) << "Completed ------ embeddings w/ KERNEL_LEVEL_PROFILE.";
+
+      if (embeddings->IsInstance<NDArray::ContainerType>()) {
+        auto emb_profile_nd = Downcast<NDArray>(embeddings);
+        LOG(WARNING) << "[KERNEL_PROFILE] emb_profile_nd shape: (" 
+                     << emb_profile_nd.Shape()[0] << ", " << emb_profile_nd.Shape()[1] << "), dtype: "
+                     << emb_profile_nd.DataType();
+      } else {
+        LOG(ERROR) << "[KERNEL_PROFILE] emb_profile_nd is not NDArray, got type: "
+                   << embeddings->GetTypeKey();
+      }
+    #else
+      ObjectRef embeddings = ft_.embed_func_(token_ids_dref_or_nd, params_);
+      LOG(WARNING) << "Completed ------ embeddings w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    //========================
+    if (dst != nullptr) {
+      CHECK(dst->defined());
+      ft_.nd_copy_embedding_to_offset_func_(embeddings, *dst, offset);
+      return *dst;
+    } else {
+      CHECK_EQ(offset, 0);
+      return embeddings;
+    }
+  }
+
+  ObjectRef ImageEmbed(const NDArray& image, ObjectRef* dst, int offset) final {
+    NVTXScopedRange nvtx_scope("ImageEmbed");
+    CHECK(ft_.image_embed_func_.defined()) << "`image_embed` function is not found in the model. ";
+
+    int tmp_h = 0, tmp_w = 0;
+    CalculateResizeShape(image, this->model_type_, &tmp_h, &tmp_w);
+    ShapeTuple resize_h = {tmp_h};
+    ShapeTuple resize_w = {tmp_w};
+
+    CalculateCropShape(image, this->model_type_, &tmp_h, &tmp_w);
+    ShapeTuple crop_h = {tmp_h};
+    ShapeTuple crop_w = {tmp_w};
+
+    auto image_dref_or_nd = ft_.CopyToWorker0(image, "image", image.Shape());
+    
+    // ObjectRef embeddings =
+    //     ft_.image_embed_func_(image_dref_or_nd, resize_h, resize_w, crop_h, crop_w, params_);
+    
+    //=============== Kernel-level profile =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      ObjectRef embeddings = 
+        ft_.profile_func_("image_embed", image_dref_or_nd, resize_h, resize_w, crop_h, crop_w, params_);
+      LOG(WARNING) << "Completed ------ image embeddings w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ObjectRef embeddings =
+        ft_.image_embed_func_(image_dref_or_nd, resize_h, resize_w, crop_h, crop_w, params_);
+      LOG(WARNING) << "Completed ------ image embeddings w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    //========================
+    
+    if (dst != nullptr) {
+      CHECK(dst->defined());
+      ft_.nd_copy_embedding_to_offset_func_(embeddings, *dst, offset);
+      return *dst;
+    } else {
+      CHECK_EQ(offset, 0);
+      return embeddings;
+    }
+  }
+
+  bool CanGetLogits() final {
+    return ft_.get_logits_func_.defined() && ft_.batch_get_logits_func_.defined();
+  }
+
+  NDArray GetLogits(const ObjectRef& hidden_states) final {
+    NVTXScopedRange nvtx_scope("GetLogits");
+    CHECK(ft_.get_logits_func_.defined()) << "`get_logits` function is not found in the model.";
+
+    ObjectRef hidden_states_dref_or_nd{nullptr};
+    if (!ft_.use_disco && hidden_states->IsInstance<DRefObj>()) {
+      hidden_states_dref_or_nd = Downcast<DRef>(hidden_states)->DebugGetFromRemote(0);
+    } else {
+      hidden_states_dref_or_nd = hidden_states;
+    }
+    // ObjectRef ret = ft_.get_logits_func_(hidden_states_dref_or_nd, params_);
+    //=============== Kernel-level profile =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      ObjectRef ret = ft_.profile_func_("get_logits",hidden_states_dref_or_nd, params_);
+      LOG(WARNING) << "Completed ------ get logits w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ObjectRef ret = ft_.get_logits_func_(hidden_states_dref_or_nd, params_); 
+      LOG(WARNING) << "Completed ------ get logits w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    //===============
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+    NDArray logits{nullptr};
+    if (ft_.use_disco) {
+      logits = Downcast<DRef>(ret)->DebugGetFromRemote(0);
+    } else {
+      logits = Downcast<NDArray>(ret);
+    }
+    // logits: (b * s, v)
+    return logits;
+  }
+
+  Array<NDArray> GetMultiStepLogits(const ObjectRef& hidden_states) final {
+    NVTXScopedRange nvtx_scope("GetMultiStepLogits");
+    CHECK(ft_.get_logits_func_.defined()) << "`get_logits` function is not found in the model.";
+
+    ObjectRef hidden_states_dref_or_nd{nullptr};
+
+    // ObjectRef ret = ft_.get_logits_func_(hidden_states, params_);
+    //=============== Kernel-level profile =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      ObjectRef ret = ft_.profile_func_("get_logits", hidden_states, params_);
+      LOG(WARNING) << "Completed ------ get MultiStep logits w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ObjectRef ret = ft_.get_logits_func_(hidden_states, params_); 
+      LOG(WARNING) << "Completed ------ get MultiStep logits w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    //===============
+    Array<NDArray> logits{nullptr};
+    if (ft_.use_disco) {
+      logits = Downcast<DRef>(ret)->DebugGetFromRemote(0);
+    } else {
+      logits = Downcast<Array<NDArray>>(ret);
+    }
+    return logits;
+  }
+
+  ObjectRef FuseEmbedHidden(const ObjectRef& embeddings, const ObjectRef& previous_hidden_states,
+                            int batch_size, int seq_len) final {
+    NVTXScopedRange nvtx_scope("FuseEmbedHidden");
+
+    ObjectRef embeddings_dref_or_nd{nullptr};
+    if (!embeddings->IsInstance<DRefObj>()) {
+      // embeddings: (n, h)
+      NDArray embeddings_nd = Downcast<NDArray>(embeddings);
+      ICHECK_NE(hidden_size_, -1);
+      ICHECK_EQ(embeddings_nd->ndim, 2);
+      ICHECK_GE(embeddings_nd->shape[0], batch_size * seq_len);
+      ICHECK_EQ(embeddings_nd->shape[1], hidden_size_);
+      embeddings_dref_or_nd =
+          embeddings_nd.CreateView({batch_size * seq_len, hidden_size_}, embeddings_nd->dtype);
+    } else {
+      ShapeTuple embedding_shape{batch_size * seq_len, hidden_size_};
+      embeddings_dref_or_nd = ft_.nd_view_func_(embeddings, embedding_shape);
+    }
+
+    ObjectRef previous_hidden_states_dref_or_nd{nullptr};
+    if (!ft_.use_disco && previous_hidden_states->IsInstance<DRefObj>()) {
+      previous_hidden_states_dref_or_nd =
+          Downcast<DRef>(previous_hidden_states)->DebugGetFromRemote(0);
+    } else {
+      previous_hidden_states_dref_or_nd = previous_hidden_states;
+    }
+    // ObjectRef fused = ft_.fuse_embed_hidden_func_(embeddings_dref_or_nd,
+    //                                               previous_hidden_states_dref_or_nd, params_);
+    //=============== Kernel-level profile =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      ObjectRef fused = ft_.profile_func_("fuse_embed_hidden_states", embeddings_dref_or_nd, 
+                                          previous_hidden_states_dref_or_nd, params_);
+      LOG(WARNING) << "Completed ------ fuse embed hidden state w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ObjectRef fused = ft_.fuse_embed_hidden_func_(embeddings_dref_or_nd,
+                                                    previous_hidden_states_dref_or_nd, params_); 
+      LOG(WARNING) << "Completed ------ fuse embed hidden state w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    //===============
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+    ShapeTuple out_shape{batch_size, seq_len, hidden_size_};
+    if (ft_.use_disco) {
+      return ft_.nd_view_func_(fused, out_shape);
+    } else {
+      NDArray fused_nd = Downcast<NDArray>(fused);
+      ICHECK_EQ(fused_nd->ndim, 2);
+      ICHECK_EQ(fused_nd->shape[0], batch_size * seq_len);
+      return fused_nd.CreateView(out_shape, fused_nd->dtype);
+    }
+  }
+
+  NDArray BatchPrefill(const ObjectRef& embeddings, const std::vector<int64_t>& seq_ids,
+                       const std::vector<int>& lengths) final {
+    CHECK(!seq_ids.empty());
+    CHECK_EQ(seq_ids.size(), lengths.size());
+    int num_sequences = seq_ids.size();
+    int total_length = 0;
+
+    int* p_logit_pos = static_cast<int*>(logit_pos_arr_->data);
+    for (int i = 0; i < num_sequences; ++i) {
+      total_length += lengths[i];
+      p_logit_pos[i] = total_length - 1;
+    }
+    NVTXScopedRange nvtx_scope("BatchPrefill num_seq=" + std::to_string(num_sequences) +
+                               " total_len=" + std::to_string(total_length));
+    NDArray logit_pos_nd = logit_pos_arr_.CreateView({num_sequences}, DataType::Int(32));
+
+    CHECK(ft_.prefill_func_.defined())
+        << "`prefill_with_embed` function is not found in the model. Please make sure the model is "
+           "compiled with flag `--sep-embed` and `--enable-batching`";
+    ICHECK(ft_.kv_cache_begin_forward_func_.defined());
+    ICHECK(ft_.kv_cache_end_forward_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    // Begin forward with the sequence ids and new lengths.
+    IntTuple seq_ids_tuple(seq_ids);
+    IntTuple lengths_tuple(lengths.begin(), lengths.end());
+    ft_.kv_cache_begin_forward_func_(kv_cache_, seq_ids_tuple, lengths_tuple);
+
+    ObjectRef embeddings_dref_or_nd;
+    if (!embeddings->IsInstance<DRefObj>()) {
+      // embeddings: (1, n, h)
+      NDArray embeddings_nd = Downcast<NDArray>(embeddings);
+      ICHECK_NE(hidden_size_, -1);
+      ICHECK_EQ(embeddings_nd->ndim, 2);
+      ICHECK_GE(embeddings_nd->shape[0], total_length);
+      ICHECK_EQ(embeddings_nd->shape[1], hidden_size_);
+      ICHECK_EQ(embeddings_nd->device.device_type, device_.device_type);
+      ICHECK_EQ(embeddings_nd->device.device_id, device_.device_id);
+      embeddings_dref_or_nd =
+          embeddings_nd.CreateView({1, total_length, hidden_size_}, embeddings_nd->dtype);
+    } else {
+      ShapeTuple embedding_shape{1, total_length, hidden_size_};
+      embeddings_dref_or_nd = ft_.nd_view_func_(embeddings, embedding_shape);
+    }
+    ICHECK_NE(max_num_sequence_, -1);
+    ObjectRef logit_pos_dref_or_nd =
+        ft_.CopyToWorker0(logit_pos_nd, "logit_pos", {max_num_sequence_});
+    // args: embeddings, logit_pos, kv_cache, params
+    ObjectRef ret;
+    //=============== Kernel-level profile =========
+    if (seq_ids.size() == 1) {
+      #ifdef KERNEL_LEVEL_PROFILE
+        ret = ft_.profile_func_("prefill", embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ single batch prefill w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        ret = ft_.single_batch_prefill_func_(embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ single batch prefill w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    } else {
+      #ifdef KERNEL_LEVEL_PROFILE
+        ret = ft_.profile_func_("batch_prefill", embeddings_dref_or_nd, logit_pos_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ batch prefill w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        ret = ft_.prefill_func_(embeddings_dref_or_nd, logit_pos_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ batch prefill w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    }
+    //=============== 
+    NDArray logits;
+    if (ft_.use_disco) {
+      ret = ft_.tuple_getitem_func_(ret, 0);
+      if (num_stages_ > 1) {
+        // Send the result from the last worker group to worker 0.
+        ShapeTuple shape{1, num_sequences, vocab_size_};
+        DataType dtype = DataType::Float(32);
+        ret = ft_.last_group_send_to_worker_0_(ret, disco_logits_arr_, shape, dtype);
+      }
+      logits = Downcast<DRef>(ret)->DebugGetFromRemote(0);
+    } else {
+      logits = Downcast<Array<NDArray>>(ret)[0];
+    }
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+    ft_.kv_cache_end_forward_func_(kv_cache_);
+
+    // logits: (1, num_sequences, v)
+    ICHECK_EQ(logits->ndim, 3);
+    ICHECK_EQ(logits->shape[0], 1);
+    ICHECK_EQ(logits->shape[1], num_sequences);
+    return logits;
+  }
+
+  ObjectRef BatchPrefillToLastHidden(const ObjectRef& embedding_or_hidden_states,
+                                     const std::vector<int64_t>& seq_ids,
+                                     const std::vector<int>& lengths) final { // prefill but return the hidden‑state tensor instead of the logits
+    NVTXScopedRange nvtx_scope("BatchPrefillToLastHidden");
+    CHECK(!seq_ids.empty());
+    CHECK_EQ(seq_ids.size(), lengths.size());
+    int num_sequences = seq_ids.size();
+    int total_length = 0;
+
+    for (int i = 0; i < num_sequences; ++i) {
+      total_length += lengths[i];
+    }
+
+    ObjectRef embedding_or_hidden_states_dref_or_nd{nullptr};
+    ShapeTuple hidden_states_shape{1, total_length, hidden_size_};
+    if (!ft_.use_disco) {
+      NDArray embedding_or_hidden_states_nd = Downcast<NDArray>(embedding_or_hidden_states);
+      embedding_or_hidden_states_dref_or_nd = embedding_or_hidden_states_nd.CreateView(
+          hidden_states_shape, embedding_or_hidden_states_nd->dtype);
+    } else {
+      embedding_or_hidden_states_dref_or_nd =
+          ft_.nd_view_func_(embedding_or_hidden_states, hidden_states_shape);
+    }
+
+    CHECK(ft_.prefill_to_last_hidden_func_.defined())
+        << "`prefill_to_last_hidden_states` function is not found in the model.";
+    ICHECK(ft_.kv_cache_begin_forward_func_.defined());
+    ICHECK(ft_.kv_cache_end_forward_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    // Begin forward with the sequence ids and new lengths.
+    IntTuple seq_ids_tuple(seq_ids);
+    IntTuple lengths_tuple(lengths.begin(), lengths.end());
+    ft_.kv_cache_begin_forward_func_(kv_cache_, seq_ids_tuple, lengths_tuple);
+
+    // args: embeddings, logit_pos, kv_cache, params
+    ObjectRef result{nullptr};
+    //=============== Kernel-level profile =========
+    if (seq_ids.size() == 1) {
+      CHECK(ft_.single_batch_prefill_to_last_hidden_func_.defined())
+          << "`single_batch_prefill_to_last_hidden_states` function is not found in the model.";
+      #ifdef KERNEL_LEVEL_PROFILE
+        result = ft_.profile_func_("prefill_to_last_hidden_states", embedding_or_hidden_states_dref_or_nd,
+                                    kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ single batch prefill2hidden w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        result = ft_.single_batch_prefill_to_last_hidden_func_(embedding_or_hidden_states_dref_or_nd,
+                                                                kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ single batch prefill2hidden w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+      // result = ft_.single_batch_prefill_to_last_hidden_func_(embedding_or_hidden_states_dref_or_nd,
+      //                                                        kv_cache_, params_);
+    } else {
+      #ifdef KERNEL_LEVEL_PROFILE
+        result = ft_.profile_func_("batch_prefill_to_last_hidden_states", 
+                                                    embedding_or_hidden_states_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ batch prefill2hidden w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        result = ft_.prefill_to_last_hidden_func_(embedding_or_hidden_states_dref_or_nd, kv_cache_,
+                                                params_);
+        LOG(WARNING) << "Completed ------ batch prefill2hidden w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    }
+    //===============
+    ObjectRef hidden_states = ft_.tuple_getitem_func_(result, 0);
+
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+    ft_.kv_cache_end_forward_func_(kv_cache_);
+
+    ShapeTuple out_shape{total_length, hidden_size_};
+    if (ft_.use_disco) {
+      return ft_.nd_view_func_(hidden_states, out_shape);
+    } else {
+      NDArray hidden_states_nd = Downcast<NDArray>(hidden_states);
+      ICHECK_EQ(hidden_states_nd->ndim, 3);
+      ICHECK_EQ(hidden_states_nd->shape[0], 1);
+      ICHECK_EQ(hidden_states_nd->shape[1], total_length);
+      ICHECK_EQ(hidden_states_nd->shape[2], hidden_size_);
+      return hidden_states_nd.CreateView(out_shape, hidden_states_nd->dtype);
+    }
+  }
+
+  NDArray BatchDecode(const ObjectRef& embeddings, const std::vector<int64_t>& seq_ids) final {
+    NVTXScopedRange nvtx_scope("BatchDecode num_seqs=" + std::to_string(seq_ids.size()));
+    int num_sequence = seq_ids.size();
+
+    CHECK(ft_.decode_func_.defined())
+        << "`decode_with_embed` function is not found in the model. Please make sure the model is "
+           "compiled with flag `--sep-embed` and `--enable-batching`";
+    ICHECK(ft_.kv_cache_begin_forward_func_.defined());
+    ICHECK(ft_.kv_cache_end_forward_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    // Reserve in KV cache for the lengths of the input.
+    // Begin forward with the sequence ids and new lengths.
+    IntTuple seq_ids_tuple(seq_ids);
+    IntTuple lengths_tuple(std::vector<int64_t>(/*n=*/seq_ids.size(), /*v=*/1));
+
+    ft_.kv_cache_begin_forward_func_(kv_cache_, seq_ids_tuple, lengths_tuple);
+
+    ObjectRef embeddings_dref_or_nd;
+    if (!embeddings->IsInstance<DRefObj>()) {
+      // embeddings: (1, b, h)
+      NDArray embeddings_nd = Downcast<NDArray>(embeddings);
+      ICHECK_NE(hidden_size_, -1);
+      ICHECK_EQ(embeddings_nd->ndim, 2);
+      ICHECK_GE(embeddings_nd->shape[0], num_sequence);
+      ICHECK_EQ(embeddings_nd->shape[1], hidden_size_);
+      ICHECK_EQ(embeddings_nd->device.device_type, device_.device_type);
+      ICHECK_EQ(embeddings_nd->device.device_id, device_.device_id);
+      embeddings_dref_or_nd =
+          embeddings_nd.CreateView({num_sequence, 1, hidden_size_}, embeddings_nd->dtype);
+    } else {
+      ShapeTuple embedding_shape{num_sequence, 1, hidden_size_};
+      embeddings_dref_or_nd = ft_.nd_view_func_(embeddings, embedding_shape);
+    }
+
+    // args: embeddings, kv_cache, params
+    //=============== Kernel-level profile =========
+    ObjectRef ret;
+    if (seq_ids.size() == 1) {
+      #ifdef KERNEL_LEVEL_PROFILE
+        ret = ft_.profile_func_("decode", embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ single batch decode w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        ret = ft_.single_batch_decode_func_(embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ single batch decode w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    } else {
+      #ifdef KERNEL_LEVEL_PROFILE
+        ret = ft_.profile_func_("batch_decode", embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ batch decode w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        ret = ft_.decode_func_(embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ batch decode w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    }
+    //===============
+    NDArray logits;
+    if (ft_.use_disco) {
+      ret = ft_.tuple_getitem_func_(ret, 0);
+      if (num_stages_ > 1) {
+        // Send the result from the last worker group to worker 0.
+        ShapeTuple shape{num_sequence, 1, vocab_size_};
+        DataType dtype = DataType::Float(32);
+        ret = ft_.last_group_send_to_worker_0_(ret, disco_logits_arr_, shape, dtype);
+      }
+      logits = Downcast<DRef>(ret)->DebugGetFromRemote(0);
+    } else {
+      logits = Downcast<Array<NDArray>>(ret)[0];
+    }
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+    ft_.kv_cache_end_forward_func_(kv_cache_);
+
+    // logits: (b, 1, v)
+    ICHECK_EQ(logits->ndim, 3);
+    ICHECK_EQ(logits->shape[0], num_sequence);
+    ICHECK_EQ(logits->shape[1], 1);
+    return logits;
+  }
+
+  NDArray BatchTreeDecode(const ObjectRef& embeddings, const std::vector<int64_t>& seq_ids,
+                          const std::vector<int>& lengths,
+                          const std::vector<int64_t>& token_tree_parent_ptr) {
+    // This is similar to BatchDecode, except that it takes 'length', so that each sequence can have
+    // multiple leaf nodes for decoding.
+    NVTXScopedRange nvtx_scope("BatchTreeDecode num_seqs=" + std::to_string(seq_ids.size()));
+    int num_sequence = seq_ids.size();
+    int total_length = 0;
+    for (int i = 0; i < num_sequence; ++i) {
+      total_length += lengths[i];
+    }
+    CHECK_EQ(total_length, token_tree_parent_ptr.size());
+
+    CHECK(ft_.decode_func_.defined())
+        << "`tree_decode_with_embed` function is not found in the model. Please make sure the "
+           "model "
+           "is compiled with flag `--sep-embed` and `--enable-batching`";
+    ICHECK(ft_.kv_cache_begin_forward_func_.defined());
+    ICHECK(ft_.kv_cache_end_forward_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    // Reserve in KV cache for the lengths of the input.
+    // Begin forward with the sequence ids and new lengths.
+    IntTuple seq_ids_tuple(seq_ids);
+    IntTuple lengths_tuple(lengths.begin(), lengths.end());
+    IntTuple token_tree_parent_ptr_tuple(token_tree_parent_ptr);
+    ft_.kv_cache_begin_forward_func_(kv_cache_, seq_ids_tuple, lengths_tuple,
+                                     token_tree_parent_ptr_tuple);
+
+    ObjectRef embeddings_dref_or_nd;
+    if (!embeddings->IsInstance<DRefObj>()) {
+      // embeddings: (1, n, h)
+      NDArray embeddings_nd = Downcast<NDArray>(embeddings);
+      ICHECK_NE(hidden_size_, -1);
+      ICHECK_EQ(embeddings_nd->ndim, 2);
+      ICHECK_GE(embeddings_nd->shape[0], total_length);
+      ICHECK_EQ(embeddings_nd->shape[1], hidden_size_);
+      ICHECK_EQ(embeddings_nd->device.device_type, device_.device_type);
+      ICHECK_EQ(embeddings_nd->device.device_id, device_.device_id);
+      embeddings_dref_or_nd =
+          embeddings_nd.CreateView({total_length, 1, hidden_size_}, embeddings_nd->dtype);
+    } else {
+      ShapeTuple embedding_shape{total_length, 1, hidden_size_};
+      embeddings_dref_or_nd = ft_.nd_view_func_(embeddings, embedding_shape);
+    }
+
+    // same as BatchDecode
+    //=============== Kernel-level profile =========
+    ObjectRef ret;
+    if (0 && seq_ids.size() == 1) {
+      #ifdef KERNEL_LEVEL_PROFILE
+        ret = ft_.profile_func_("decode", embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ single batch tree decode w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        ret = ft_.single_batch_decode_func_(embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ single batch tree decode w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    } else {
+      #ifdef KERNEL_LEVEL_PROFILE
+        ret = ft_.profile_func_("batch_decode", embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ batch tree decode w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        ret = ft_.decode_func_(embeddings_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ batch tree decode w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    }
+    //===============
+    NDArray logits;
+    if (ft_.use_disco) {
+      Array<ObjectRef> result = Downcast<DRef>(ret)->DebugGetFromRemote(0);
+      logits = Downcast<NDArray>(result[0]);
+    } else {
+      logits = Downcast<Array<NDArray>>(ret)[0];
+    }
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+    ft_.kv_cache_end_forward_func_(kv_cache_);
+
+    // logits: (b, 1, v)
+    ICHECK_EQ(logits->ndim, 3);
+    ICHECK_EQ(logits->shape[0], total_length);
+    ICHECK_EQ(logits->shape[1], 1);
+    return logits;
+  }
+
+  ObjectRef BatchDecodeToLastHidden(const ObjectRef& hidden_states_dref_or_nd,
+                                    const std::vector<int64_t>& seq_ids) final {
+    NVTXScopedRange nvtx_scope("BatchDecodeToLastHidden num_seqs=" +
+                               std::to_string(seq_ids.size()));
+    int num_sequence = seq_ids.size();
+
+    CHECK(ft_.decode_to_last_hidden_func_.defined())
+        << "`batch_decode_to_last_hidden_states` function is not found in the model.";
+    ICHECK(ft_.kv_cache_begin_forward_func_.defined());
+    ICHECK(ft_.kv_cache_end_forward_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    // Reserve in KV cache for the lengths of the input.
+    // Begin forward with the sequence ids and new lengths.
+    IntTuple seq_ids_tuple(seq_ids);
+    IntTuple lengths_tuple(std::vector<int64_t>(/*n=*/seq_ids.size(), /*v=*/1));
+    ft_.kv_cache_begin_forward_func_(kv_cache_, seq_ids_tuple, lengths_tuple);
+
+    // args: embeddings, kv_cache, params
+    //=============== Kernel-level profile =========
+    ObjectRef result{nullptr};
+    if (seq_ids.size() == 1) {
+      CHECK(ft_.single_batch_decode_to_last_hidden_func_.defined())
+          << "`decode_to_last_hidden_states` function is not found in the model.";
+      #ifdef KERNEL_LEVEL_PROFILE
+        result = ft_.profile_func_("decode_to_last_hidden_states", hidden_states_dref_or_nd, kv_cache_,
+                  params_);
+        LOG(WARNING) << "Completed ------ single batch decode to last hidden w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        result = ft_.single_batch_decode_to_last_hidden_func_(hidden_states_dref_or_nd, kv_cache_,
+                  params_);
+        LOG(WARNING) << "Completed ------ single batch decode to last hidden w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    } else {
+      #ifdef KERNEL_LEVEL_PROFILE
+        result = ft_.profile_func_("batch_decode_to_last_hidden_states", hidden_states_dref_or_nd, kv_cache_, 
+                  params_);
+        LOG(WARNING) << "Completed ------ batch decode to last hidden w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        result = ft_.decode_to_last_hidden_func_(hidden_states_dref_or_nd, kv_cache_, params_);
+        LOG(WARNING) << "Completed ------ batch decode to last hidden w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+    }
+    //===============
+    ft_.kv_cache_end_forward_func_(kv_cache_);
+    ObjectRef hidden_states = ft_.tuple_getitem_func_(result, 0);
+
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+
+    // hidden_states: (b, 1, v) to (b, v)
+    ShapeTuple out_shape{num_sequence, hidden_size_};
+    if (ft_.use_disco) {
+      return ft_.nd_view_func_(hidden_states, out_shape);
+    } else {
+      NDArray hidden_states_nd = Downcast<NDArray>(hidden_states);
+      ICHECK_EQ(hidden_states_nd->ndim, 3);
+      ICHECK_EQ(hidden_states_nd->shape[0], num_sequence);
+      ICHECK_EQ(hidden_states_nd->shape[1], 1);
+      ICHECK_EQ(hidden_states_nd->shape[2], hidden_size_);
+      return hidden_states_nd.CreateView(out_shape, hidden_states_nd->dtype);
+    }
+  }
+
+  NDArray BatchVerify(const ObjectRef& embeddings, const std::vector<int64_t>& seq_ids,
+                      const std::vector<int>& lengths,
+                      const std::vector<int64_t>& token_tree_parent_ptr) final {
+    CHECK(!seq_ids.empty());
+    CHECK_EQ(seq_ids.size(), lengths.size());
+    int num_sequences = seq_ids.size();
+    int total_length = 0;
+    for (int i = 0; i < num_sequences; ++i) {
+      total_length += lengths[i];
+    }
+    CHECK_EQ(total_length, token_tree_parent_ptr.size());
+
+    NVTXScopedRange nvtx_scope("BatchVerify num_tokens=" + std::to_string(total_length));
+
+    CHECK(ft_.verify_func_.defined())
+        << "`verify_with_embed` function is not found in the model. Please make sure the model is "
+           "compiled with flag `--sep-embed` and `--enable-batching`";
+    ICHECK(ft_.kv_cache_begin_forward_func_.defined());
+    ICHECK(ft_.kv_cache_end_forward_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    // Begin forward with the sequence ids and new lengths.
+    IntTuple seq_ids_tuple(seq_ids);
+    IntTuple lengths_tuple(lengths.begin(), lengths.end());
+    IntTuple token_tree_parent_ptr_tuple(token_tree_parent_ptr);
+    ft_.kv_cache_begin_forward_func_(kv_cache_, seq_ids_tuple, lengths_tuple,
+                                     token_tree_parent_ptr_tuple);
+
+    ObjectRef embeddings_dref_or_nd;
+    if (!embeddings->IsInstance<DRefObj>()) {
+      // embeddings: (1, n, h)
+      NDArray embeddings_nd = Downcast<NDArray>(embeddings);
+      ICHECK_NE(hidden_size_, -1);
+      ICHECK_EQ(embeddings_nd->ndim, 2);
+      ICHECK_GE(embeddings_nd->shape[0], total_length);
+      ICHECK_EQ(embeddings_nd->shape[1], hidden_size_);
+      ICHECK_EQ(embeddings_nd->device.device_type, device_.device_type);
+      ICHECK_EQ(embeddings_nd->device.device_id, device_.device_id);
+      embeddings_dref_or_nd =
+          embeddings_nd.CreateView({1, total_length, hidden_size_}, embeddings_nd->dtype);
+    } else {
+      ShapeTuple embedding_shape{1, total_length, hidden_size_};
+      embeddings_dref_or_nd = ft_.nd_view_func_(embeddings, embedding_shape);
+    }
+    // args: embeddings, logit_pos, kv_cache, params
+    //=============== Kernel-level profile =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      ObjectRef ret = ft_.profile_func_("batch_verify", embeddings_dref_or_nd, kv_cache_, params_);
+      LOG(WARNING) << "Completed ------ batch verify w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ObjectRef ret = ft_.verify_func_(embeddings_dref_or_nd, kv_cache_, params_);
+      LOG(WARNING) << "Completed ------ batch verify w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    //===============
+
+    NDArray logits;
+    if (ft_.use_disco) {
+      ret = ft_.tuple_getitem_func_(ret, 0);
+      if (num_stages_ > 1) {
+        // Send the result from the last worker group to worker 0.
+        ShapeTuple shape{1, total_length, vocab_size_};
+        DataType dtype = DataType::Float(32);
+        ret = ft_.last_group_send_to_worker_0_(ret, disco_logits_arr_, shape, dtype);
+      }
+      logits = Downcast<DRef>(ret)->DebugGetFromRemote(0);
+    } else {
+      logits = Downcast<Array<NDArray>>(ret)[0];
+    }
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+    ft_.kv_cache_end_forward_func_(kv_cache_);
+
+    // logits: (1, total_length, v)
+    ICHECK_EQ(logits->ndim, 3);
+    ICHECK_EQ(logits->shape[0], 1);
+    ICHECK_EQ(logits->shape[1], total_length);
+    return logits;
+  }
+
+  ObjectRef BatchVerifyToLastHidden(const ObjectRef& embeddings,
+                                    const std::vector<int64_t>& seq_ids,
+                                    const std::vector<int>& lengths,
+                                    const std::vector<int64_t>& token_tree_parent_ptr) final {
+    CHECK(!seq_ids.empty());
+    CHECK_EQ(seq_ids.size(), lengths.size());
+    int num_sequences = seq_ids.size();
+    int total_length = 0;
+    for (int i = 0; i < num_sequences; ++i) {
+      total_length += lengths[i];
+    }
+    CHECK_EQ(total_length, token_tree_parent_ptr.size());
+    NVTXScopedRange nvtx_scope("BatchVerifyToLastHidden num_tokens=" +
+                               std::to_string(total_length));
+
+    CHECK(ft_.verify_to_last_hidden_func_.defined())
+        << "`batch_verify_to_last_hidden_states` function is not found in the model.";
+    ICHECK(ft_.kv_cache_begin_forward_func_.defined());
+    ICHECK(ft_.kv_cache_end_forward_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    ObjectRef embeddings_dref_or_nd;
+    if (!embeddings->IsInstance<DRefObj>()) {
+      // embeddings: (1, n, h)
+      NDArray embeddings_nd = Downcast<NDArray>(embeddings);
+      ICHECK_NE(hidden_size_, -1);
+      ICHECK_EQ(embeddings_nd->ndim, 2);
+      ICHECK_GE(embeddings_nd->shape[0], total_length);
+      ICHECK_EQ(embeddings_nd->shape[1], hidden_size_);
+      ICHECK_EQ(embeddings_nd->device.device_type, device_.device_type);
+      ICHECK_EQ(embeddings_nd->device.device_id, device_.device_id);
+      embeddings_dref_or_nd =
+          embeddings_nd.CreateView({1, total_length, hidden_size_}, embeddings_nd->dtype);
+    } else {
+      ShapeTuple embedding_shape{1, total_length, hidden_size_};
+      embeddings_dref_or_nd = ft_.nd_view_func_(embeddings, embedding_shape);
+    }
+    // Begin forward with the sequence ids and new lengths.
+    IntTuple seq_ids_tuple(seq_ids);
+    IntTuple lengths_tuple(lengths.begin(), lengths.end());
+    IntTuple token_tree_parent_ptr_tuple(token_tree_parent_ptr);
+    ft_.kv_cache_begin_forward_func_(kv_cache_, seq_ids_tuple, lengths_tuple,
+                                     token_tree_parent_ptr_tuple);
+
+    // args: embeddings, logit_pos, kv_cache, params
+    //=============== Kernel-level profile =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      ObjectRef result = ft_.profile_func_("batch_verify_to_last_hidden_states", embeddings_dref_or_nd, kv_cache_, params_);
+      LOG(WARNING) << "Completed ------ batch verify to last hidden w/ KERNEL_LEVEL_PROFILE.";
+      #else
+      ObjectRef result = ft_.verify_to_last_hidden_func_(embeddings_dref_or_nd, kv_cache_, params_);
+      LOG(WARNING) << "Completed ------ batch verify to last hidden w/ KERNEL_LEVEL_PROFILE.";
+      #endif
+    //===============
+    ft_.kv_cache_end_forward_func_(kv_cache_);
+
+    ObjectRef hidden_states = ft_.tuple_getitem_func_(result, 0);
+    if (trace_enabled_) {
+      TVMSynchronize(device_.device_type, device_.device_id, nullptr);
+    }
+
+    ShapeTuple out_shape{total_length, hidden_size_};
+    if (!ft_.use_disco) {
+      NDArray hidden_states_nd = Downcast<NDArray>(hidden_states);
+      ICHECK_EQ(hidden_states_nd->ndim, 3);
+      ICHECK_EQ(hidden_states_nd->shape[0], 1);
+      ICHECK_EQ(hidden_states_nd->shape[1], total_length);
+      ICHECK_EQ(hidden_states_nd->shape[2], hidden_size_);
+      return hidden_states_nd.CreateView(out_shape, hidden_states_nd->dtype);
+    } else {
+      return ft_.nd_view_func_(hidden_states, out_shape);
+    }
+  }
+
+  /*********************** KV Cache Management  ***********************/
+
+  void CreateKVCache(int page_size, int max_num_sequence, int64_t max_total_sequence_length,
+                     int64_t prefill_chunk_size, int max_history_size) final {
+    KVStateKind kv_state_kind = GetMetadata().kv_state_kind;
+    if (kv_state_kind == KVStateKind::kKVCache) {
+      IntTuple max_num_sequence_tuple{max_num_sequence};
+      IntTuple max_total_sequence_length_tuple{max_total_sequence_length};
+      IntTuple prefill_chunk_size_tuple{prefill_chunk_size};
+      IntTuple page_size_tuple{page_size};
+      IntTuple support_sliding_window{sliding_window_size_ != -1};
+
+      //=============== 4/22/2025 Update =========
+      #ifdef KERNEL_LEVEL_PROFILE
+        kv_cache_ = ft_.profile_func_(ft_.kv_cache_func_name_, max_num_sequence_tuple, max_total_sequence_length_tuple,
+                                              prefill_chunk_size_tuple, page_size_tuple,
+                                              support_sliding_window);
+        LOG(WARNING) << "Completed ------ created KV cache using [" << ft_.kv_cache_func_name_ << "] w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        kv_cache_ = ft_.create_kv_cache_func_(max_num_sequence_tuple, max_total_sequence_length_tuple,
+                                              prefill_chunk_size_tuple, page_size_tuple,
+                                              support_sliding_window);
+        LOG(WARNING) << "Completed ------ created KV cache using [" << ft_.kv_cache_func_name_ << "] w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+      // kv_cache_ = ft_.create_kv_cache_func_(max_num_sequence_tuple, max_total_sequence_length_tuple,
+      //                                       prefill_chunk_size_tuple, page_size_tuple,
+      //                                       support_sliding_window);
+      //===============
+      local_kv_cache_ =
+          ft_.use_disco ? Downcast<DRef>(kv_cache_)->DebugGetFromRemote(0) : kv_cache_;
+    } else if (kv_state_kind == KVStateKind::kRNNState) {
+      IntTuple max_num_sequence_tuple{max_num_sequence};
+      IntTuple max_history_size_tuple = {std::max(max_history_size, 1)};
+      //=============== 4/22/2025 Update =========
+      #ifdef KERNEL_LEVEL_PROFILE
+        kv_cache_ = ft_.profile_func_(ft_.kv_cache_func_name_, max_num_sequence_tuple, max_history_size_tuple);
+        LOG(WARNING) << "Completed ------ created KV cache using [" << ft_.kv_cache_func_name_ << "] w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        kv_cache_ = ft_.create_kv_cache_func_(max_num_sequence_tuple, max_history_size_tuple);
+        LOG(WARNING) << "Completed ------ created KV cache using [" << ft_.kv_cache_func_name_ << "] w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+        // kv_cache_ = ft_.create_kv_cache_func_(max_num_sequence_tuple, max_history_size_tuple);
+      //===============
+      local_kv_cache_ =
+          ft_.use_disco ? Downcast<DRef>(kv_cache_)->DebugGetFromRemote(0) : kv_cache_;
+    } else if (kv_state_kind == KVStateKind::kNone) {
+      // Do nothing
+    } else {
+      LOG(FATAL) << "Unknown kv_state_kind: " << static_cast<int>(kv_state_kind);
+    }
+  }
+
+  void AddNewSequence(int64_t seq_id) final {
+    if (ft_.model_metadata_.kv_state_kind == KVStateKind::kNone) {
+      return;
+    }
+    //=============== 4/22/2025 Update =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      // ft_.profile_func_("vm.builtin.kv_state_add_sequence", kv_cache_, seq_id);
+      ft_.kv_cache_add_sequence_func_(kv_cache_, seq_id);
+      LOG(WARNING) << "Completed ------ add new sequence [" << seq_id << "] w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ft_.kv_cache_add_sequence_func_(kv_cache_, seq_id);
+      LOG(WARNING) << "Completed ------ add new sequence [" << seq_id << "] w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    // ft_.kv_cache_add_sequence_func_(kv_cache_, seq_id);
+    //===============
+  }
+
+  void ForkSequence(int64_t parent_seq_id, int64_t child_seq_id, int64_t fork_pos) final {
+    if (ft_.model_metadata_.kv_state_kind == KVStateKind::kNone) {
+      return;
+    }
+    //=============== 4/22/2025 Update =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      // ft_.profile_func_("vm.builtin.kv_state_fork_sequence", kv_cache_, parent_seq_id, child_seq_id, fork_pos);
+      ft_.kv_cache_fork_sequence_func_(kv_cache_, parent_seq_id, child_seq_id, fork_pos);
+      LOG(WARNING) << "Completed —— Forked sequence [parent=" << parent_seq_id 
+                   << ", child=" << child_seq_id << ", fork_pos=" << fork_pos 
+                   << "] with KERNEL_LEVEL_PROFILE enabled.";
+    #else
+      ft_.kv_cache_fork_sequence_func_(kv_cache_, parent_seq_id, child_seq_id, fork_pos);
+      LOG(WARNING) << "Completed —— Forked sequence [parent=" << parent_seq_id 
+                   << ", child=" << child_seq_id << ", fork_pos=" << fork_pos 
+                   << "] without KERNEL_LEVEL_PROFILE.";
+    #endif
+    // ft_.kv_cache_fork_sequence_func_(kv_cache_, parent_seq_id, child_seq_id, fork_pos);
+    //===============
+  }
+
+  void RemoveSequence(int64_t seq_id) final {
+    if (this->kind == KVStateKind::kNone) {
+      return;
+    }
+    //=============== 4/22/2025 Update =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      // ft_.profile_func_("vm.builtin.kv_state_remove_sequence", kv_cache_, seq_id);
+      ft_.kv_cache_remove_sequence_func_(kv_cache_, seq_id);
+      LOG(WARNING) << "Completed ------ remove sequence [" << seq_id << "] w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ft_.kv_cache_remove_sequence_func_(kv_cache_, seq_id);
+      LOG(WARNING) << "Completed ------ remove sequence [" << seq_id << "] w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    // ft_.kv_cache_remove_sequence_func_(kv_cache_, seq_id);
+    //===============
+  }
+
+  void PopNFromKVCache(int64_t seq_id, int num_tokens) final {
+    if (this->kind == KVStateKind::kNone) {
+      return;
+    }
+    //=============== 4/22/2025 Update =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      // ft_.profile_func_("vm.builtin.kv_state_popn", kv_cache_, seq_id, num_tokens);
+      ft_.kv_cache_popn_func_(kv_cache_, seq_id, num_tokens);
+      LOG(WARNING) << "Completed ------ removed " << num_tokens << " tokens from sequence ["
+                   << seq_id << "] w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ft_.kv_cache_popn_func_(kv_cache_, seq_id, num_tokens);
+      LOG(WARNING) << "Completed ------ removed " << num_tokens << " tokens from sequence ["
+                   << seq_id << "] w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    // ft_.kv_cache_popn_func_(kv_cache_, seq_id, num_tokens);
+    //===============
+  }
+
+  // committing the accepted tokens (after speculative decoding) into the KV cache for the given sequences
+  void CommitAcceptedTokenTreeNodesToKVCache(
+      const std::vector<int64_t>& seq_ids,
+      const std::vector<int64_t>& accepted_leaf_indices) final {
+    IntTuple seq_ids_tuple(seq_ids);
+    IntTuple accepted_leaf_indices_tuple(accepted_leaf_indices);
+    //=============== 4/22/2025 Update =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      // ft_.profile_func_("vm.builtin.attention_kv_cache_commit_accepted_token_tree_nodes", 
+      //                   kv_cache_, seq_ids_tuple, accepted_leaf_indices_tuple);
+      ft_.kv_cache_commit_accepted_token_tree_nodes_func_(kv_cache_, seq_ids_tuple,
+                                                          accepted_leaf_indices_tuple);
+      LOG(WARNING) << "Completed ------ committed accepted token tree nodes for sequences ["
+                   << seq_ids_tuple << "] w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ft_.kv_cache_commit_accepted_token_tree_nodes_func_(kv_cache_, seq_ids_tuple,
+                                                          accepted_leaf_indices_tuple);
+      LOG(WARNING) << "Completed ------ committed accepted token tree nodes for sequences ["
+                   << seq_ids_tuple << "] w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    // ft_.kv_cache_commit_accepted_token_tree_nodes_func_(kv_cache_, seq_ids_tuple,
+                                                        // accepted_leaf_indices_tuple);
+    //===============
+  }
+
+  void EnableSlidingWindowForSeq(int64_t seq_id) final {
+    if (this->kind == KVStateKind::kNone) {
+      return;
+    }
+    if (sliding_window_size_ != -1) {
+      //=============== 4/22/2025 Update =========
+      #ifdef KERNEL_LEVEL_PROFILE
+        // ft_.profile_func_("vm.builtin.attention_kv_cache_enable_sliding_window_for_seq", 
+        //                   kv_cache_, seq_id, sliding_window_size_, attention_sink_size_);
+        ft_.kv_cache_enable_sliding_window_for_seq_(kv_cache_, seq_id, sliding_window_size_,
+                                                    attention_sink_size_);
+        LOG(WARNING) << "Completed ------ enabled sliding window for sequence [" << seq_id << "] with size "
+                     << sliding_window_size_ << " and sink size " << attention_sink_size_ 
+                     << " w/ KERNEL_LEVEL_PROFILE.";
+      #else
+        ft_.kv_cache_enable_sliding_window_for_seq_(kv_cache_, seq_id, sliding_window_size_,
+                                                    attention_sink_size_);
+        LOG(WARNING) << "Completed ------ enabled sliding window for sequence [" << seq_id << "] with size "
+                     << sliding_window_size_ << " and sink size " << attention_sink_size_ 
+                     << " w/o KERNEL_LEVEL_PROFILE.";
+      #endif
+      // ft_.kv_cache_enable_sliding_window_for_seq_(kv_cache_, seq_id, sliding_window_size_,
+      //                                             attention_sink_size_);
+      //===============
+    }
+  }
+
+  IntTuple DisaggPrepareKVRecv(int64_t seq_id, int length) final {
+    NVTXScopedRange nvtx_scope("DisaggPrepareKVRecv length=" + std::to_string(length));
+
+    ICHECK(ft_.kv_cache_disagg_prepare_recv_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    // Run KV receive preparation.
+    ObjectRef ret;
+    //=============== 4/22/2025 Update =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      // ret = ft_.profile_func_("vm.builtin.kv_cache_disagg_prepare_recv", 
+      //                        kv_cache_, seq_id, length);
+      ret = ft_.kv_cache_disagg_prepare_recv_func_(kv_cache_, seq_id, length);
+      LOG(WARNING) << "Completed ------ prepared disaggregated KV receive for sequence [" 
+                   << seq_id << "] with sliding window size " << sliding_window_size_
+                   << " and sink size " << attention_sink_size_ 
+                   << " w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ret = ft_.kv_cache_disagg_prepare_recv_func_(kv_cache_, seq_id, length);
+      LOG(WARNING) << "Completed ------ prepared disaggregated KV receive for sequence [" 
+                   << seq_id << "] with sliding window size " << sliding_window_size_
+                   << " and sink size " << attention_sink_size_ 
+                   << " w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    // ret = ft_.kv_cache_disagg_prepare_recv_func_(kv_cache_, seq_id, length);
+    //=============== 
+    IntTuple compressed_kv_append_metadata;
+    if (ft_.use_disco) {
+      compressed_kv_append_metadata = Downcast<DRef>(ret)->DebugGetFromRemote(0);
+    } else {
+      compressed_kv_append_metadata = Downcast<IntTuple>(ret);
+    }
+
+    return compressed_kv_append_metadata;
+  }
+
+  void DisaggMarkKVSend(int64_t seq_id, int begin_pos, IntTuple compressed_kv_append_metadata,
+                        int dst_group_offset) final {
+    NVTXScopedRange nvtx_scope("DisaggMarkKVSend seq_id=" + std::to_string(seq_id) +
+                               " begin_pos=" + std::to_string(begin_pos));
+
+    ICHECK(ft_.kv_cache_disagg_mark_send_func_.defined());
+    ICHECK(kv_cache_.defined()) << "KV cache has not been initialized.";
+
+    // Run KV send preparation.
+    //=============== 4/22/2025 Update =========
+    #ifdef KERNEL_LEVEL_PROFILE
+      // ft_.profile_func_("vm.builtin.kv_cache_disagg_mark_send", kv_cache_, seq_id, 
+      //                   begin_pos, compressed_kv_append_metadata, dst_group_offset);
+      ft_.kv_cache_disagg_mark_send_func_(kv_cache_, seq_id, begin_pos, compressed_kv_append_metadata,
+                                          dst_group_offset);
+      LOG(WARNING) << "Completed -- marked disaggregated KV send for sequence ["
+                   << seq_id << "] starting at position " << begin_pos
+                   << ", with sliding window size " << sliding_window_size_
+                   << " and sink size " << attention_sink_size_
+                   << " w/ KERNEL_LEVEL_PROFILE.";
+    #else
+      ft_.kv_cache_disagg_mark_send_func_(kv_cache_, seq_id, begin_pos, compressed_kv_append_metadata,
+        dst_group_offset);
+      LOG(WARNING) << "Completed -- marked disaggregated KV send for sequence ["
+                   << seq_id << "] starting at position " << begin_pos
+                   << ", with sliding window size " << sliding_window_size_
+                   << " and sink size " << attention_sink_size_
+                   << " w/o KERNEL_LEVEL_PROFILE.";
+    #endif
+    // ft_.kv_cache_disagg_mark_send_func_(kv_cache_, seq_id, begin_pos, compressed_kv_append_metadata,
+    //                                     dst_group_offset);
+  }
+
+  /************** Raw Info Query **************/
+
+  ModelMetadata GetMetadata() const final { return ft_.model_metadata_; }
+
+  int GetNumAvailablePages() const final {
+    if (this->kind == KVStateKind::kRNNState || this->kind == KVStateKind::kNone) {
+      // RNNState does not introduce new page at runtime
+      return std::numeric_limits<int>::max();
+    } else {
+      return ft_.kv_cache_get_num_available_pages_func_(local_kv_cache_);
+    }
+  }
+
+  int GetCurrentTotalSequenceLength() const final {
+    if (this->kind == KVStateKind::kRNNState || this->kind == KVStateKind::kNone) {
+      // RNNState does not have a total sequence length limit
+      return 0;
+    } else {
+      return ft_.kv_cache_get_total_sequence_length_func_(local_kv_cache_);
+    }
+  }
+
+  /*********************** Utilities  ***********************/
+
+  void LoadParams() final { this->params_ = ft_.LoadParams(model_, device_); }
+
+  void SetMaxNumSequence(int max_num_sequence) final {
+    this->max_num_sequence_ = max_num_sequence;
+    this->logit_pos_arr_ =
+        NDArray::Empty({max_num_sequence}, DataType::Int(32), Device{DLDeviceType::kDLCPU, 0});
+  }
+
+  void SetPrefillChunkSize(int prefill_chunk_size) final {
+    this->prefill_chunk_size_ = prefill_chunk_size;
+    Device preferred_host_device = GetPreferredHostDevice(device_);
+    memory::Allocator* allocator = memory::MemoryManager::GetOrCreateAllocator(
+        preferred_host_device, memory::AllocatorType::kNaive);
+    ICHECK_NOTNULL(allocator);
+    token_ids_storage_ = memory::Storage(
+        allocator->Alloc(preferred_host_device, {prefill_chunk_size_}, DataType::Int(32)),
+        allocator);
+    if (this->num_stages_ > 1) {
+      // Create a remote NDArray for logits when pipeline parallelism is enabled.
+      disco_logits_arr_ =
+          ft_.Empty({prefill_chunk_size_, vocab_size_}, DataType::Float(32), device_,
+                    /*worker0_only=*/true);
+    }
+  }
+
+
+  LogitProcessor CreateLogitProcessor(int max_num_token,
+                                      Optional<EventTraceRecorder> trace_recorder) final {
+    return LogitProcessor(max_num_token, vocab_size_, &this->ft_, device_,
+                          std::move(trace_recorder));
+  }
+
+  Sampler CreateSampler(int max_num_sample, int num_models,
+                        Optional<EventTraceRecorder> trace_recorder) final {
+    if (Sampler::SupportGPUSampler(device_)) {
+      return Sampler::CreateGPUSampler(max_num_sample, vocab_size_, &this->ft_, device_,
+                                       std::move(trace_recorder));
+    } else {
+      return Sampler::CreateCPUSampler(std::move(trace_recorder));
+    }
+  }
+
+  int EstimateHostCPURequirement() const final {
+    CHECK_NE(num_shards_, -1) << "The model has not been initialized";
+    return num_shards_ > 1 ? num_shards_ : 0;
+  }
+
+  int GetSlidingWindowSize() const final { return sliding_window_size_; }
+
+  int GetAttentionSinkSize() const final { return attention_sink_size_; }
+
+  ObjectRef AllocEmbeddingTensor() final {
+    if (!ft_.alloc_embedding_tensor_func_.defined()) {
+      return ObjectRef{nullptr};
+    }
+    // Allocate the embedding tensor.
+    ObjectRef embedding = ft_.alloc_embedding_tensor_func_();
+    // Get the shape of the embedding tensor for hidden size.
+    ShapeTuple embedding_shape;
+    if (ft_.use_disco) {
+      ICHECK(embedding->IsInstance<DRefObj>());
+      ObjectRef shape_ref = ft_.nd_get_shape_func_(embedding);
+      embedding_shape = Downcast<DRef>(shape_ref)->DebugGetFromRemote(0);
+    } else {
+      NDArray embedding_nd = Downcast<NDArray>(embedding);
+      embedding_shape = embedding_nd.Shape();
+    }
+    ICHECK_NE(prefill_chunk_size_, -1);
+    ICHECK_EQ(embedding_shape.size(), 2);
+    ICHECK_GE(embedding_shape[0], prefill_chunk_size_);
+    this->hidden_size_ = embedding_shape[1];
+    return embedding;
+  }
+
+  ObjectRef AllocHiddenStatesTensor() final {
+    if (!ft_.alloc_embedding_tensor_func_.defined()) {
+      return ObjectRef{nullptr};
+    }
+    // Allocate the hidden_states tensor.
+    // Use the same function as embeddings.
+    ObjectRef hidden_states = ft_.alloc_embedding_tensor_func_();
+    NDArray hidden_states_nd{nullptr};
+    // Get the shape of the hidden_states tensor for hidden size.
+    if (ft_.use_disco) {
+      ICHECK(hidden_states->IsInstance<DRefObj>());
+      hidden_states_nd = Downcast<DRef>(hidden_states)->DebugGetFromRemote(0);
+    } else {
+      hidden_states_nd = Downcast<NDArray>(hidden_states);
+    }
+    ShapeTuple hidden_states_shape = hidden_states_nd.Shape();
+    ICHECK_NE(prefill_chunk_size_, -1);
+    ICHECK_EQ(hidden_states_shape.size(), 2);
+    ICHECK_GE(hidden_states_shape[0], prefill_chunk_size_);
+    this->hidden_size_ = hidden_states_shape[1];
+    this->hidden_states_dtype_ = hidden_states_nd->dtype;
+    return hidden_states;
+  }
+
+  void Reset() final {
+    // Reset the KV cache.
+    if (kv_cache_.defined()) {
+      ft_.reset_kv_cache_func_(kv_cache_);
+      LOG(WARNING) << "Completed ------ reset kv cache.";
+    }
+  }
+
+  /********************** Utilities for speculative decoding **********************/
+
+  DraftTokenWorkspaceManager CreateDraftTokenWorkspaceManager(int max_num_tokens) {
+    return DraftTokenWorkspaceManager(max_num_tokens, vocab_size_, hidden_size_,
+                                      hidden_states_dtype_, device_, ft_);
+  }
+
+  ObjectRef GatherHiddenStates(const ObjectRef& input, const std::vector<int>& indices,
+                               ObjectRef* dst) final {
+    ObjectRef dst_view{nullptr};
+    ShapeTuple out_shape{static_cast<int64_t>(indices.size()), hidden_size_};
+    if ((*dst)->IsInstance<DRefObj>()) {
+      dst_view = ft_.nd_view_func_(*dst, out_shape);
+    } else {
+      NDArray dst_nd = Downcast<NDArray>(*dst);
+      dst_view = dst_nd.CreateView(out_shape, hidden_states_dtype_);
+    }
+    NDArray indices_nd =
+        logit_pos_arr_.CreateView({static_cast<int64_t>(indices.size())}, DataType::Int(32));
+    indices_nd.CopyFromBytes(indices.data(), indices.size() * sizeof(int));
+    ICHECK_NE(max_num_sequence_, -1);
+    ObjectRef indices_device = ft_.CopyToWorker0(indices_nd, "logit_pos", {max_num_sequence_});
+    ft_.gather_hidden_states_func_(input, indices_device, dst_view);
+    return dst_view;
+  }
+
+  void ScatterHiddenStates(const ObjectRef& input, const std::vector<int>& indices,
+                           ObjectRef* dst) final {
+    NDArray indices_nd =
+        logit_pos_arr_.CreateView({static_cast<int64_t>(indices.size())}, DataType::Int(32));
+    indices_nd.CopyFromBytes(indices.data(), indices.size() * sizeof(int));
+    ICHECK_NE(max_num_sequence_, -1);
+    ObjectRef indices_device = ft_.CopyToWorker0(indices_nd, "logit_pos", {max_num_sequence_});
+    ft_.scatter_hidden_states_func_(input, indices_device, *dst);
+  }
+
+  NDArray GatherDraftProbs(const NDArray& input, const std::vector<int>& indices,
+                           NDArray* dst) final {
+    NDArray dst_view =
+        dst->CreateView({static_cast<int64_t>(indices.size()), vocab_size_}, DataType::Float(32));
+    NDArray indices_nd =
+        logit_pos_arr_.CreateView({static_cast<int64_t>(indices.size())}, DataType::Int(32));
+    indices_nd.CopyFromBytes(indices.data(), indices.size() * sizeof(int));
+    ICHECK_NE(max_num_sequence_, -1);
+    ObjectRef indices_device =
+        ft_.CopyToWorker0(indices_nd, "logit_pos_local", {max_num_sequence_}, /*local_only=*/true);
+    ft_.gather_probs_func_(input, indices_device, dst_view);
+    return dst_view;
+  }
+
+  void ScatterDraftProbs(const NDArray& input, const std::vector<int>& indices,
+                         NDArray* dst) final {
+    NDArray indices_nd =
+        logit_pos_arr_.CreateView({static_cast<int64_t>(indices.size())}, DataType::Int(32));
+    indices_nd.CopyFromBytes(indices.data(), indices.size() * sizeof(int));
+    ICHECK_NE(max_num_sequence_, -1);
+    ObjectRef indices_device =
+        ft_.CopyToWorker0(indices_nd, "logit_pos_local", {max_num_sequence_}, /*local_only=*/true);
+    ft_.scatter_probs_func_(input, indices_device, *dst);
+  }
+
+  Array<NDArray> GetMedusaLogits(const ObjectRef& hidden_states) {
+    ObjectRef result = ft_.get_logits_func_(hidden_states);
+    Array<NDArray> logits{nullptr};
+    if (ft_.use_disco) {
+      logits = Downcast<DRef>(result)->DebugGetFromRemote(0);
+    } else {
+      logits = Downcast<Array<NDArray>>(result);
+    }
+    return logits;
+  }
+
+  /************** Debug/Profile **************/
+
+  void DebugCallFuncOnAllAllWorker(const String& func_name, Optional<String> func_args) final {
+    ft_.DebugCallFuncOnAllAllWorker(func_name, func_args);
+  }
+
+ private:
+  /*! \brief Load model configuration from JSON. */
+  void LoadModelConfigJSON(const picojson::object& config) {
+    this->sliding_window_size_ =
+        json::LookupOrDefault<int64_t>(config, "sliding_window_size", this->sliding_window_size_);
+    CHECK(sliding_window_size_ == -1 || sliding_window_size_ > 0)
+        << "Sliding window should be either -1 (which means disabled) of positive";
+    this->attention_sink_size_ =
+        json::LookupOrDefault<int64_t>(config, "attention_sink_size", this->attention_sink_size_);
+    this->attention_sink_size_ = std::max(this->attention_sink_size_, 0);
+    this->vocab_size_ = json::Lookup<int64_t>(config, "vocab_size");
+    this->model_type_ = json::Lookup<std::string>(config, "model_type");
+  }
+
+  //----------------------------
+  // Model configurations
+  //----------------------------
+  std::string model_;
+  int sliding_window_size_ = -1;
+  int attention_sink_size_ = 0;
+  int num_shards_ = -1;
+  int num_stages_ = -1;
+  int max_num_sequence_ = -1;
+  int prefill_chunk_size_ = -1;
+  int hidden_size_ = -1;
+  DLDataType hidden_states_dtype_;
+  int vocab_size_ = -1;
+  int image_embed_size_ = -1;
+  std::string model_type_;
+  //----------------------------
+  // TVM related states
+  //----------------------------
+  // Packed function table
+  FunctionTable ft_;
+  // Paged KV cache.
+  // - We use `kv_cache_` for general KV cache operations.
+  // When tensor parallelism is enabled, `kv_cache_` is a DRef object.
+  // - For efficient KV cache raw info query, we use `local_kv_cache`
+  // as a local **reference** of `kv_cache_`. It is a pure mirror of `kv_cache_`
+  // except that it is always a local object.
+  ObjectRef kv_cache_{nullptr};
+  ObjectRef local_kv_cache_{nullptr};
+  // Runtime device
+  Device device_;
+  // Model parameters
+  ObjectRef params_;
+  // Shared NDArray
+  memory::Storage token_ids_storage_{nullptr};
+  NDArray logit_pos_arr_{nullptr};
+  ObjectRef disco_logits_arr_{nullptr};
+  // A boolean indicating if tracing is enabled.
+  bool trace_enabled_;
+  // An enum indicating whether it's RNN-based.
+  KVStateKind kind;
+};
+
+TVM_REGISTER_GLOBAL("mlc.copy_embedding_to_offset")
+    .set_body_typed([](NDArray embedding, NDArray dst, int offset) {
+      // embedding: (m, hidden_size)
+      // dst: (prefill_chunk_size, hidden_size)
+      ICHECK_EQ(embedding->ndim, 2);
+      ICHECK_EQ(dst->ndim, 2);
+      ICHECK_LE(embedding->shape[0] + offset, dst->shape[0]);
+      ICHECK_EQ(embedding->shape[1], dst->shape[1]);
+      const DLTensor& copy_src = *(embedding.operator->());
+      const DLTensor* p_copy_dst = dst.operator->();
+      DLTensor copy_dst = *p_copy_dst;
+      copy_dst.shape = embedding->shape;
+      copy_dst.byte_offset =
+          offset * embedding->shape[1] * ((embedding->dtype.bits * embedding->dtype.lanes + 7) / 8);
+      NDArray::CopyFromTo(&copy_src, &copy_dst);
+    });
+
+}  // namespace serve
+}  // namespace llm
+}  // namespace mlc
