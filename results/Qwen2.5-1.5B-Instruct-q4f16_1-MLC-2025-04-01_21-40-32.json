@@ -1,0 +1,13 @@
+[
+  {
+    "completion_tokens": 477,
+    "decode_tokens_per_s": 8.266486167907715,
+    "modelId": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+    "prefill_tokens_per_s": 1.3318897485733032,
+    "prompt": "How to prepare for a photographic trip Bring a camera or cameras. If at all possible, it is a good idea to have a backup. If you have some type of mechanical or power failure, you will not be able to take any pictures without a backup. Then,",
+    "prompt_tokens": 73,
+    "response": "1. Bring a variety of lenses. You'll need different types of lenses depending on the type of photography you'll be doing. If you're doing landscape photography, you'll need a wide-angle lens. If you're doing portrait photography, you'll need a telephoto lens. If you're doing macro photography, you'll need a macro lens. Bring at least one lens for each type of photography you'll be doing.\n\n2. Bring extra batteries. Bring more batteries than you think you'll need. If your batteries die during your trip, you'll be out of luck. Bring at least two extra batteries for each camera you have.\n\n3. Bring a memory card. You'll need a memory card to store your photos. Bring a memory card that is large enough to store all the photos you'll be taking. You may also want to bring a microSD card, as it can be used to transfer photos from your camera to a computer later.\n\n4. Bring a tripod. If you're doing macro photography or long exposure photography, you'll need a tripod. A tripod will allow you to take photos that are not affected by camera shake.\n\n5. Bring a case. You'll want to protect your camera from scratches, dents, and other damage. Bring a case that is large enough to fit your camera, lenses, and other accessories.\n\n6. Bring a backpack. You'll need a place to carry all your equipment. A backpack will also allow you to carry snacks, water, and other items that you may need during your trip.\n\n7. Bring a charger. If you're traveling to a place that doesn't have access to electricity, you'll need a charger to charge your camera and other devices. Bring a portable charger that can be plugged into a wall outlet.\n\n8. Bring a waterproof cover. If you're going to be taking photos underwater, you'll need a waterproof cover. This will protect your camera from water damage.\n\n9. Bring a camera strap. If you're not used to carrying a camera, you'll need a camera strap to carry your camera. This will also protect your camera from damage during transit.\n\n10. Bring a map and a guidebook. If you're going to be taking photos in a new area, you'll need to know where you're going. Bring a map and a guidebook to help you navigate.",
+    "responseId": 0,
+    "total_tokens": 550
+  }
+]

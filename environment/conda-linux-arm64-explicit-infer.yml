@@ -1,0 +1,100 @@
+name: phase env
+channels:
+  - defaults
+  # - conda-forge
+dependencies:
+  # Core Python stack
+  - python=3.11.13
+  - pip
+  - setuptools
+  - wheel
+  - typing_extensions=4.15.0
+  - packaging
+  - python-dateutil
+  - readline
+  - tk
+
+  # Numerical and Scientific Computing
+  - blas=1.0=openblas
+  - libopenblas
+  - numpy=2.3.1
+  - psutil
+
+  # Visualization and Graphics Stack
+  - matplotlib=3.10.5
+  - pillow=11.3.0
+  - fonttools
+  - freetype
+  - fontconfig
+  - cairo
+  - pango
+  - gdk-pixbuf
+  - librsvg
+  - graphviz=2.50.0
+  - python-graphviz
+  - poppler
+  - poppler-data
+
+  # Jupyter related
+  - ipython=9.1.0
+  - jupyter_core
+  - jupyter_client
+  - ipykernel=6.29.5
+  - traitlets
+  - tornado
+  - pyzmq
+  - zeromq
+  - nest-asyncio
+  - wcwidth
+  - pygments
+  - prompt-toolkit
+
+  # Compilation and Build Toolchain
+  - cmake=3.31.2
+  - cython=3.1.3
+  - llvmdev=20.1.8
+  - llvm-tools=20.1.8
+  - llvm-openmp
+
+  # Network and Security Components
+  - curl
+  - libcurl
+  - openssl
+  - sqlite
+  - zlib
+  - xz
+  - zstd
+  - lz4-c
+
+  # commom tools
+  - git
+  - git-lfs
+
+  # Other multimedia codecs
+  - jpeg
+  - libpng
+  - libtiff
+  - libwebp
+  - libwebp-base
+  - openjpeg
+  - dav1d
+  - aom
+  - pixman
+  - graphite2
+  - harfbuzz
+  - fribidi
+  - icu
+  - gts
+  - expat
+  - libiconv
+  - libffi
+  - ncurses
+
+  # Font Support
+  - fonts-anaconda
+  - fonts-conda-ecosystem
+  - font-ttf-dejavu-sans-mono
+  - font-ttf-inconsolata
+  - font-ttf-source-code-pro
+  - font-ttf-ubuntu
+

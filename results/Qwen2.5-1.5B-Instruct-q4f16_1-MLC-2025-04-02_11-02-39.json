@@ -1,0 +1,46 @@
+[
+  {
+    "completion_tokens": 10,
+    "decode_tokens_per_s": 9.916241645812988,
+    "modelId": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+    "prefill_tokens_per_s": 1.1176427602767944,
+    "prompt": "Hello!",
+    "prompt_tokens": 21,
+    "response": "Hello! How can I help you today?",
+    "responseId": 0,
+    "total_tokens": 31
+  },
+  {
+    "completion_tokens": 19,
+    "decode_tokens_per_s": 10.329988479614258,
+    "modelId": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+    "prefill_tokens_per_s": 1.0387159585952759,
+    "prompt": "What's your name?",
+    "prompt_tokens": 45,
+    "response": "Hello! I'm an AI language model named Claude. How can I assist you today?",
+    "responseId": 1,
+    "total_tokens": 64
+  },
+  {
+    "completion_tokens": 27,
+    "decode_tokens_per_s": 10.085355758666992,
+    "modelId": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+    "prefill_tokens_per_s": 1.0802743434906006,
+    "prompt": "Tell me a joke.",
+    "prompt_tokens": 78,
+    "response": "Sure, here's a joke for you:\nWhy don't scientists trust atoms?\nBecause they try to nucleate every single time!",
+    "responseId": 2,
+    "total_tokens": 105
+  },
+  {
+    "completion_tokens": 22,
+    "decode_tokens_per_s": 9.437812805175781,
+    "modelId": "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+    "prefill_tokens_per_s": 0.9259042739868164,
+    "prompt": "Another one!",
+    "prompt_tokens": 117,
+    "response": "Sure, here's another one:\nWhy did the tomato turn red?\nBecause it saw the salad dressing!",
+    "responseId": 3,
+    "total_tokens": 139
+  }
+]
