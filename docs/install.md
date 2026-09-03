@@ -146,9 +146,6 @@ conda activate lm-meter-kernel     # For kernel-level profiling
 conda activate lm-meter-infer      # For phase-level profiling
 conda activate melt-reproduce      # For melting point profiling
 ```
-For MacOS with Intel chipsets:
-> ⏳ Coming soon — we are preparing explicit environment files for this platform.
-
 ## C. Build LM-Meter from Source 
 We created automated build scripts that streamline the compilation process and ensure reproducibility. All scripts are located in `scripts/` and `scripts/build_util/`. Before running any build, make sure to activate the corresponding conda environment. Run the following commands from the LM-Meter repository root.
 
